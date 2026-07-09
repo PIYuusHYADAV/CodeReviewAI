@@ -1,5 +1,7 @@
 import { Octokit } from "@octokit/rest";
-
+import { createAppAuth } from "@octokit/auth-app";
+import fs from "fs";
+import path from "path";
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 
 export type PRFile = {
@@ -16,10 +18,26 @@ export type PullRequestDetails = {
   baseBranch: string;
   headBranch: string;
 };
+export async function getOctokit(installationId: number): Promise<Octokit> {
+  const privateKey = fs.readFileSync(
+    path.resolve(process.cwd(), "aicodereview001.2026-07-09.private-key.pem"),
+    "utf-8",
+  );
+  const auth = createAppAuth({
+    appId: process.env.APP_ID!,
+    privateKey,
+  });
+  const { token } = await auth({
+    type: "installation",
+    installationId,
+  });
+  return new Octokit({ auth: token });
+}
 export async function postPRComment(
   repo: string,
   prNumber: number,
   body: string,
+  octokit: Octokit,
 ): Promise<void> {
   try {
     const [owner, repoName] = repo.split("/");
@@ -41,6 +59,7 @@ export async function postInlineComment(
   line: number,
   body: string,
   path: string,
+  octokit: Octokit,
 ) {
   try {
     const [owner, repoName] = repo.split("/");
@@ -62,12 +81,13 @@ export const fileContents = async (
   diff: PRFile[],
   repo: string,
   commitsha: string,
+  octokit: Octokit,
 ) => {
   return Promise.all(
     diff
       .filter((f) => f.status !== "removed")
       .map(async (f) => {
-        const content = await getContent(repo, f.filename, commitsha);
+        const content = await getContent(repo, f.filename, commitsha, octokit);
         return {
           filename: f.filename,
           path: f.filename,
@@ -80,6 +100,7 @@ export const fileContents = async (
 export async function getDiffPr(
   repo: string,
   prNumber: number,
+  octokit: Octokit,
 ): Promise<PRFile[]> {
   try {
     const [owner, repoName] = repo.split("/");
@@ -107,6 +128,7 @@ export async function getDiffPr(
 export async function getPrDetails(
   repo: string,
   prNumber: number,
+  octokit: Octokit,
 ): Promise<PullRequestDetails> {
   try {
     const [owner, repoName] = repo.split("/");
@@ -131,7 +153,12 @@ export async function getPrDetails(
   }
 }
 
-export async function getContent(repo: string, filePath: string, ref: string) {
+export async function getContent(
+  repo: string,
+  filePath: string,
+  ref: string,
+  octokit: Octokit,
+) {
   try {
     const [owner, repoName] = repo.split("/");
     const { data } = await octokit.repos.getContent({

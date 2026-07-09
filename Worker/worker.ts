@@ -6,6 +6,7 @@ import {
   fileContents,
   postPRComment,
   postInlineComment,
+  getOctokit,
 } from "../lib/github";
 import {
   runSecurityAgent,
@@ -15,21 +16,24 @@ import {
 } from "../lib/agent";
 import { runAggregator } from "../lib/aggregator";
 async function processReview(job: Job) {
-  const { repo, prNumber, commitSha, title } = job.data;
+  console.log(job.data);
+  const { repo, prNumber, commitSha, title, installationId } = job.data;
+  console.log("Installation iD====================", installationId);
+  const octokit = await getOctokit(installationId);
   console.log(`\n[Worker] Processing PR #${prNumber} in ${repo}`);
   console.log(`  Commit : ${commitSha}`);
   console.log(`  Title  : ${title}`);
   console.log("Fetching PR details...");
-  const diff = await getDiffPr(repo, prNumber);
+  const diff = await getDiffPr(repo, prNumber, octokit);
   console.log("PF =================", diff);
-  const details = await getPrDetails(repo, prNumber);
+  const details = await getPrDetails(repo, prNumber, octokit);
   console.log("Got details:", details);
   console.log(`[Worker] Fetched ${diff.length} changed files`);
   console.log(
     `[Worker] Files:`,
     diff.map((f) => `${f.status}: ${f.filename}`),
   );
-  const filesWithContent = await fileContents(diff, repo, commitSha);
+  const filesWithContent = await fileContents(diff, repo, commitSha, octokit);
 
   const fileMetadata = filesWithContent.map((f) => ({
     filename: f.filename,
@@ -60,7 +64,7 @@ async function processReview(job: Job) {
   console.log("Breakdown:", review.breakdown);
   console.log("Total Findings:", review.findings.length);
   console.log("Findings:", JSON.stringify(review.findings, null, 2));
-  await postPRComment(repo, prNumber, review.summary);
+  await postPRComment(repo, prNumber, review.summary, octokit);
   const inlineFindings = review.findings.filter((f) => f.line);
 
   await Promise.allSettled(
@@ -73,6 +77,7 @@ async function processReview(job: Job) {
         `${f.severity === "critical" ? "🔴" : f.severity === "warning" ? "🟡" : "🔵"} **${f.severity.toUpperCase()}** — ${f.message}`,
 
         f.file,
+        octokit,
       ),
     ),
   );

@@ -3,14 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev ",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "worker": "npx tsx Worker/index.ts"
+    "worker": "npx tsx Worker/index.ts --watch"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@octokit/auth-app": "^8.2.0",
     "@octokit/rest": "^22.0.1",
     "bullmq": "^5.79.2",
     "crypto": "^1.0.1",

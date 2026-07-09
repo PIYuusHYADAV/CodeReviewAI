@@ -8,11 +8,18 @@ export async function POST(req: NextRequest) {
     console.log("THis is the signature=", signature);
     console.log("____+++++++++++++++++++++_______");
     console.log("this is the raw body= ", rawbody);
+    console.log("Webhook Secret:", process.env.WEBHOOK_SECRET);
+    console.log("Received Signature:", signature);
+    // console.log("Computed Signature:", digest);
+    console.log("Length Received:", Buffer.from(signature).length);
+    // console.log("Length Computed:", Buffer.from(digest).length);
     const hmac = crypto.createHmac("sha256", process.env.WEBHOOK_SECRET!);
+
     const digest = "sha256=" + hmac.update(rawbody).digest("hex");
     if (!crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(signature))) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
+
     const payload = JSON.parse(rawbody);
     const event = req.headers.get("x-github-event");
     console.log("==============EVENT===========");
@@ -27,6 +34,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
     const { number, head, base, title } = payload.pull_request;
+    const installationId = payload.installation?.id;
     const repo = payload.repository.full_name;
     const commitSha = head.sha;
     const jobId = `${repo}:${number}:${commitSha}`;
@@ -40,6 +48,7 @@ export async function POST(req: NextRequest) {
         commitSha,
         basesha: base.sha,
         title,
+        installationId,
       },
       { jobId },
     );
