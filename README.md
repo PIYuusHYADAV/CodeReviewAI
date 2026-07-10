@@ -11,6 +11,7 @@ Built with Next.js, BullMQ, Redis, Groq, and Gemini 2.5 Flash. Integrates as a *
 Open a PR → bot automatically reviews it and posts findings:
 
 **Summary comment (PR Conversation tab)**
+
 ```
 ## 🤖 CodeReview AI
 
@@ -78,33 +79,38 @@ Post to GitHub PR
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 14 (App Router) |
-| Language | TypeScript |
-| Job Queue | BullMQ |
-| Cache / Queue Store | Redis |
-| GitHub Integration | GitHub App + Octokit |
-| LLM (Agents) | Groq — LLaMA 3.3-70b |
-| LLM (Aggregator) | Google Gemini 2.5 Flash |
-| Auth | GitHub App (installation tokens) |
-| Worker Runtime | tsx |
+| Layer               | Technology                       |
+| ------------------- | -------------------------------- |
+| Framework           | Next.js 14 (App Router)          |
+| Language            | TypeScript                       |
+| Job Queue           | BullMQ                           |
+| Cache / Queue Store | Redis                            |
+| GitHub Integration  | GitHub App + Octokit             |
+| LLM (Agents)        | Groq — LLaMA 3.3-70b             |
+| LLM (Aggregator)    | Google Gemini 2.5 Flash          |
+| Auth                | GitHub App (installation tokens) |
+| Worker Runtime      | tsx                              |
 
 ---
 
 ## How It Works
 
 ### 1. GitHub App Webhook
+
 Every PR event fires a webhook to `/api/webhook/github`. The route verifies the HMAC-SHA256 signature, checks Redis for idempotency (same commit never reviewed twice), and pushes a job to BullMQ. Returns `200` immediately — all processing is async.
 
 ### 2. Job Queue
+
 BullMQ with Redis handles async processing with automatic retries (3 attempts, exponential backoff) and concurrency control (3 parallel jobs).
 
 ### 3. GitHub App Authentication
+
 Instead of a personal access token, the app uses **GitHub App installation tokens** — short-lived tokens (1 hour) scoped to the specific repo that triggered the review. This means the bot can review PRs on any repo where the app is installed, not just yours.
 
 ### 4. Parallel Agent Fanout
+
 4 agents review the PR simultaneously:
+
 - **Security** — hardcoded secrets, injection vulnerabilities, auth bypass, exposed sensitive data
 - **Performance** — N+1 queries, memory leaks, blocking I/O, inefficient algorithms
 - **Style** — naming conventions, dead code, missing error handling, overly complex functions
@@ -113,10 +119,13 @@ Instead of a personal access token, the app uses **GitHub App installation token
 Security, Performance, and Style agents receive the **diff patch** — enough context for line-level issues. The Architecture agent receives **full file content** — needed for broader design analysis.
 
 ### 5. Gemini Aggregator
+
 All 4 agent results are passed to Gemini 2.5 Flash which merges findings, removes duplicates flagged by multiple agents, scores each dimension from 1-10, and writes a human-readable summary.
 
 ### 6. GitHub Comments
+
 Results are posted back to the PR as:
+
 - A **summary comment** on the Conversation tab with scores and all findings
 - **Inline review comments** anchored to specific lines in the diff (for findings with line numbers)
 
@@ -125,6 +134,7 @@ Results are posted back to the PR as:
 ## Setup
 
 ### Prerequisites
+
 - Node.js 18+
 - Redis (Docker: `docker run -d -p 6379:6379 redis`)
 - Groq API key — [console.groq.com](https://console.groq.com)
@@ -134,8 +144,8 @@ Results are posted back to the PR as:
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/PIYuusHYADAV/pr-review-bot
-cd pr-review-bot
+git clone https://github.com/PIYuusHYADAV/CodeReviewAI
+cd CodeReviewAI
 npm install
 ```
 
