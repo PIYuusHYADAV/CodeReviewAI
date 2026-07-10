@@ -15,6 +15,18 @@ import {
   runStyleAgent,
 } from "../lib/agent";
 import { runAggregator } from "../lib/aggregator";
+import http from "http";
+
+
+const PORT = process.env.PORT || 3001;
+http
+  .createServer((req, res) => {
+    res.writeHead(200);
+    res.end("Worker running");
+  })
+  .listen(PORT, () => {
+    console.log(`[Worker] Health check server on port ${PORT}`);
+  });
 async function processReview(job: Job) {
   console.log(job.data);
   const { repo, prNumber, commitSha, title, installationId } = job.data;
