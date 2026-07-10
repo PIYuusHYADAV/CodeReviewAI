@@ -4,6 +4,10 @@ An AI-powered GitHub bot that automatically reviews pull requests using **4 spec
 
 Built with Next.js, BullMQ, Redis, Groq, and Gemini 2.5 Flash. Integrates as a **GitHub App** so reviews appear as `codereview-ai[bot]` comments directly on PRs.
 
+> ### 🔗 [**Install the app → github.com/apps/aicodereview001**](https://github.com/apps/aicodereview001)
+>
+> Add it to any repo and it starts reviewing new PRs automatically — no setup on your end required.
+
 ---
 
 ## Demo
@@ -77,6 +81,26 @@ Post to GitHub PR
 
 ---
 
+## Deployment Architecture
+
+The app runs as **three independently deployed services** across three platforms — not a single monolith, and not colocated on one host:
+
+| Service               | Platform          | Role                                                                     |
+| --------------------- | ----------------- | ------------------------------------------------------------------------ |
+| Web service (Next.js) | **Vercel**        | Receives GitHub webhooks, verifies signatures, enqueues jobs             |
+| Queue / shared state  | **Upstash Redis** | Serverless-friendly managed Redis backing BullMQ + idempotency           |
+| Worker process        | **Render**        | Long-running process that pulls jobs, runs the LLM agents, posts results |
+
+**Why split across three platforms?**
+
+- **Vercel** is built for stateless, bursty request traffic — perfect for a webhook receiver that needs to respond in under 10 seconds and scale to zero when idle.
+- **Upstash Redis** is a serverless Redis built for exactly this pattern — HTTP/edge-friendly, no persistent connection management needed from a serverless function, and it's the one piece of shared state both the web service and the worker read/write against.
+- **Render** hosts the worker as a genuine long-running process — something Vercel's serverless functions aren't designed for, since LLM calls to 4 agents plus an aggregator can take well past a typical serverless execution limit.
+
+**The result:** each tier scales, deploys, and fails independently. A traffic spike on the webhook (many PRs opened at once) never touches worker capacity — jobs just queue up in Upstash and the Render worker drains them at its own pace. Redeploying the worker to ship a prompt tweak doesn't require redeploying the web service, and vice versa.
+
+---
+
 ## Tech Stack
 
 | Layer               | Technology                       |
@@ -84,12 +108,14 @@ Post to GitHub PR
 | Framework           | Next.js 14 (App Router)          |
 | Language            | TypeScript                       |
 | Job Queue           | BullMQ                           |
-| Cache / Queue Store | Redis                            |
+| Cache / Queue Store | Redis (Upstash, managed)         |
 | GitHub Integration  | GitHub App + Octokit             |
 | LLM (Agents)        | Groq — LLaMA 3.3-70b             |
 | LLM (Aggregator)    | Google Gemini 2.5 Flash          |
 | Auth                | GitHub App (installation tokens) |
 | Worker Runtime      | tsx                              |
+| Hosting — Web       | Vercel                           |
+| Hosting — Worker    | Render                           |
 
 ---
 
@@ -131,12 +157,24 @@ Results are posted back to the PR as:
 
 ---
 
+## Highlights
+
+- **Real GitHub App, not a token hack** — own bot identity (`codereview-ai[bot]`), short-lived per-repo installation tokens, and 3x the rate limit of a personal access token.
+- **Genuinely distributed deployment** — web service (Vercel), queue (Upstash Redis), and worker (Render) run as three separately deployed, separately scaling services, not one process wearing three hats.
+- **Async job processing done right** — webhook responds in under 10 seconds (as GitHub requires) while the actual 10-30s LLM calls run in the background on a completely separate worker.
+- **Multi-agent LLM fanout** — 4 specialized agents (Security, Performance, Style, Architecture) run concurrently via `Promise.all`, each with a narrow, focused prompt rather than one generic "review everything" call — turning total review time into the slowest single agent instead of the sum of all four.
+- **LLM-based aggregation, not string matching** — a Gemini 2.5 Flash pass merges and deduplicates overlapping findings across agents, scores each dimension, and writes a coherent summary.
+- **Security-conscious webhook design** — HMAC-SHA256 signature verification and idempotency keyed on `repo:prNumber:commitSha` to safely handle GitHub's webhook retries.
+- **Line-anchored inline review comments** — findings map back to exact diff lines, not just a wall of text in a summary comment.
+
+---
+
 ## Setup
 
 ### Prerequisites
 
 - Node.js 18+
-- Redis (Docker: `docker run -d -p 6379:6379 redis`)
+- Redis (Docker: `docker run -d -p 6379:6379 redis`, or an Upstash Redis instance for production)
 - Groq API key — [console.groq.com](https://console.groq.com)
 - Gemini API key — [aistudio.google.com](https://aistudio.google.com)
 - GitHub App (see below)
@@ -152,7 +190,7 @@ npm install
 ### 2. Create a GitHub App
 
 - Go to [github.com/settings/apps/new](https://github.com/settings/apps/new)
-- Set webhook URL to your deployment URL + `/api/webhook/github`
+- Set the webhook URL to your web service's URL + `/api/webhook/github`
 - Set permissions: **Pull requests** (Read & Write), **Contents** (Read), **Issues** (Read & Write), **Metadata** (Read)
 - Subscribe to **Pull request** events
 - Generate a private key → download the `.pem` file
@@ -175,7 +213,7 @@ GEMINI_API_KEY=AIzaxxxx
 REDIS_URL=redis://localhost:6379
 ```
 
-### 4. Run
+### 4. Run locally
 
 ```bash
 # Terminal 1 — Next.js
@@ -234,6 +272,9 @@ Total review time = slowest single agent (~5-8s) instead of sum of all agents (~
 
 **Why Gemini for aggregation?**
 Multiple agents often flag the same issue from different angles. Gemini's stronger reasoning capability handles deduplication and synthesis better than a programmatic merge, and produces more coherent summaries.
+
+**Why Vercel + Upstash + Render instead of one host?**
+Each service has a fundamentally different runtime profile: the web service is bursty request/response traffic (Vercel's specialty), Redis needs to be reachable from a serverless function without connection-pool headaches (Upstash's HTTP-based Redis solves this), and the worker needs to run continuously for 10-30s LLM calls (which serverless functions aren't built for, but Render is). Matching each service to the platform built for its workload beats forcing everything onto one server.
 
 **Idempotency via jobId**
 `jobId = repo:prNumber:commitSha` — BullMQ skips a job if the same ID already exists. Prevents double-reviews when GitHub retries webhooks.
