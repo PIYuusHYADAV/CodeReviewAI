@@ -18,11 +18,19 @@ export type PullRequestDetails = {
   baseBranch: string;
   headBranch: string;
 };
+let privateKey: string;
+
 export async function getOctokit(installationId: number): Promise<Octokit> {
-  const privateKey = fs.readFileSync(
-    path.resolve(process.cwd(), "aicodereview001.2026-07-09.private-key.pem"),
-    "utf-8",
+  const pemPath = path.resolve(
+    process.cwd(),
+    "aicodereview001.2026-07-09.private-key.pem",
   );
+
+  if (fs.existsSync(pemPath)) {
+    privateKey = fs.readFileSync(pemPath, "utf-8");
+  } else {
+    privateKey = process.env.GITHUB_APP_PRIVATE_KEY!.replace(/\\n/g, "\n");
+  }
   const auth = createAppAuth({
     appId: process.env.APP_ID!,
     privateKey,
