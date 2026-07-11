@@ -20,6 +20,7 @@ export type PullRequestDetails = {
 let privateKey: string;
 
 export async function getOctokit(installationId: number): Promise<Octokit> {
+  console.log(installationId);
   const pemPath = path.resolve(
     process.cwd(),
     "aicodereview001.2026-07-09.private-key.pem",

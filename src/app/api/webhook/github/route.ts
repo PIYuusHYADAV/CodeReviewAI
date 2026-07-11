@@ -87,6 +87,7 @@ export async function POST(req: NextRequest) {
         });
       }
       const octokit = await getOctokit(installationId);
+      console.log(octokit);
       const { data: pr } = await octokit.pulls.get({
         owner: repo.split("/")[0],
         repo: repo.split("/")[1],
