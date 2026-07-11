@@ -29,7 +29,7 @@ export async function getOctokit(installationId: number): Promise<Octokit> {
   if (fs.existsSync(pemPath)) {
     privateKey = fs.readFileSync(pemPath, "utf-8");
   } else {
-    privateKey = process.env.GITHUB_APP_PRIVATE_KEY!.replace(/\\n/g, "\n");
+    privateKey = process.env.privatekey!.replace(/\\n/g, "\n");
   }
   const auth = createAppAuth({
     appId: process.env.APP_ID!,
