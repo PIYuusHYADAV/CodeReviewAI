@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { reviewQueue } from "../../../../../lib/queue";
+import { getOctokit } from "../../../../../lib/github";
 export async function POST(req: NextRequest) {
   try {
     const rawbody = await req.text();
@@ -24,35 +25,78 @@ export async function POST(req: NextRequest) {
     const event = req.headers.get("x-github-event");
     console.log("==============EVENT===========");
     console.log(event);
-    if (event !== "pull_request")
-      return NextResponse.json(
-        { message: "It is not a Pull request" },
-        { status: 200 },
+    if (event === "pull_request") {
+      const action = payload.action;
+      if (!["opened", "synchronize"].includes(action)) {
+        return NextResponse.json({ ok: true });
+      }
+      const { number, head, base, title } = payload.pull_request;
+      const installationId = payload.installation?.id;
+      const repo = payload.repository.full_name;
+      const commitSha = head.sha;
+      const jobId = `${repo}:${number}:${commitSha}`;
+      console.log("=====================JOBID=============");
+      console.log(jobId);
+      await reviewQueue.add(
+        "review-pr",
+        {
+          repo,
+          prNumber: number,
+          commitSha,
+          basesha: base.sha,
+          title,
+          installationId,
+        },
+        { jobId },
       );
-    const action = payload.action;
-    if (!["opened", "synchronize"].includes(action)) {
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, jobId });
     }
-    const { number, head, base, title } = payload.pull_request;
-    const installationId = payload.installation?.id;
-    const repo = payload.repository.full_name;
-    const commitSha = head.sha;
-    const jobId = `${repo}:${number}:${commitSha}`;
-    console.log("=====================JOBID=============");
-    console.log(jobId);
-    await reviewQueue.add(
-      "review-pr",
-      {
-        repo,
-        prNumber: number,
-        commitSha,
-        basesha: base.sha,
-        title,
-        installationId,
-      },
-      { jobId },
-    );
-    return NextResponse.json({ ok: true, jobId });
+    if (event === "issue_comment") {
+      const action = payload.action;
+      const comment = payload.comment.body.trim();
+      const sender = payload.comment.user.login;
+      const isPR = !payload.issue.pull_request;
+      if (
+        action !== "created" ||
+        !isPR ||
+        comment !== "/review" ||
+        sender.includes("[bot]")
+      ) {
+        return NextResponse.json({ ok: true, message: "Ignored Comment" });
+      }
+      const repo = payload.repository.full_name;
+      const prNumber = payload.issue.number;
+      const installationId = payload.installation?.id;
+      const octokit = await getOctokit(installationId);
+      const { data: pr } = await octokit.pulls.get({
+        owner: repo.split("/")[0],
+        repo: repo.split("/")[1],
+        pull_number: prNumber,
+      });
+      const commitSha = pr.head.sha;
+      const jobId = `${repo}:${prNumber}:${commitSha}:manual`;
+      await reviewQueue.add(
+        "review-pr",
+        {
+          repo,
+          prNumber,
+          commitSha,
+          baseSha: pr.base.sha,
+          title: pr.title,
+          installationId,
+        },
+        { jobId },
+      );
+
+      return NextResponse.json({ ok: true, jobId, trigger: "manual" });
+    }
+    if (event !== "pull_request" && event !== "issue_comment") {
+      return NextResponse.json({
+        message:
+          "The following PR is neither a pull request or a issue comment",
+        status: 200,
+      });
+    }
   } catch (e) {
     if (e instanceof Error) {
       throw new Error(e.message);
