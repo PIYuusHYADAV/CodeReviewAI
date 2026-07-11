@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, message: "Ignored Comment" });
       }
       const repo = payload.repository.full_name;
+
       const prNumber = payload.issue.number;
       const installationId = payload.installation?.id;
       const octokit = await getOctokit(installationId);
@@ -73,6 +74,14 @@ export async function POST(req: NextRequest) {
         repo: repo.split("/")[1],
         pull_number: prNumber,
       });
+      if (!repo || !prNumber || !installationId) {
+        console.log("Missing fields:", { repo, prNumber, installationId });
+        return NextResponse.json({
+          ok: true,
+          message: "Missing required fields",
+        });
+      }
+
       const commitSha = pr.head.sha;
       const jobId = `${repo.replace("/", "-")}--${prNumber}--${commitSha}--manual`;
       await reviewQueue.add(
