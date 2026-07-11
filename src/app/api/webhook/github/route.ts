@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       const installationId = payload.installation?.id;
       const repo = payload.repository.full_name;
       const commitSha = head.sha;
-      const jobId = `${repo}:${number}:${commitSha}`;
+      const jobId = `${repo.replace("/", "-")}--${number}--${commitSha}`;
       console.log("=====================JOBID=============");
       console.log(jobId);
       await reviewQueue.add(
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       const action = payload.action;
       const comment = payload.comment.body.trim();
       const sender = payload.comment.user.login;
-      const isPR = !payload.issue.pull_request;
+      const isPR = payload.issue.pull_request;
       if (
         action !== "created" ||
         !isPR ||
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
         pull_number: prNumber,
       });
       const commitSha = pr.head.sha;
-      const jobId = `${repo}:${prNumber}:${commitSha}:manual`;
+      const jobId = `${repo.replace("/", "-")}--${prNumber}--${commitSha}--manual`;
       await reviewQueue.add(
         "review-pr",
         {
