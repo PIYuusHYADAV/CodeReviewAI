@@ -68,12 +68,6 @@ export async function POST(req: NextRequest) {
 
       const prNumber = payload.issue.number;
       const installationId = payload.installation?.id;
-      const octokit = await getOctokit(installationId);
-      const { data: pr } = await octokit.pulls.get({
-        owner: repo.split("/")[0],
-        repo: repo.split("/")[1],
-        pull_number: prNumber,
-      });
       if (!repo || !prNumber || !installationId) {
         console.log("Missing fields:", { repo, prNumber, installationId });
         return NextResponse.json({
@@ -81,6 +75,12 @@ export async function POST(req: NextRequest) {
           message: "Missing required fields",
         });
       }
+      const octokit = await getOctokit(installationId);
+      const { data: pr } = await octokit.pulls.get({
+        owner: repo.split("/")[0],
+        repo: repo.split("/")[1],
+        pull_number: prNumber,
+      });
 
       const commitSha = pr.head.sha;
       const jobId = `${repo.replace("/", "-")}--${prNumber}--${commitSha}--manual`;
