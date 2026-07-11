@@ -52,6 +52,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, jobId });
     }
     if (event === "issue_comment") {
+      console.log("FULL PAYLOAD KEYS:", Object.keys(payload));
+      console.log("comment:", payload.comment);
+      console.log("issue:", payload.issue);
+      console.log("repository:", payload.repository);
+      console.log("installation:", payload.installation);
       const action = payload.action;
       const comment = payload.comment.body.trim();
       const sender = payload.comment.user.login;
