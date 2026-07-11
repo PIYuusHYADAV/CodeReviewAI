@@ -73,6 +73,12 @@ export async function POST(req: NextRequest) {
 
       const prNumber = payload.issue.number;
       const installationId = payload.installation?.id;
+      console.log("repo,prNumber,installationID", {
+        repo,
+        prNumber,
+        installationId,
+      });
+
       if (!repo || !prNumber || !installationId) {
         console.log("Missing fields:", { repo, prNumber, installationId });
         return NextResponse.json({
