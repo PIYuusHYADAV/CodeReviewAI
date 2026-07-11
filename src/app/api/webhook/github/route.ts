@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
       });
 
       const commitSha = pr.head.sha;
-      const jobId = `${repo.replace("/", "-")}--${prNumber}--${commitSha}--manual`;
+      const jobId = `${repo}--${prNumber}--${commitSha}--manual`;
       await reviewQueue.add(
         "review-pr",
         {
