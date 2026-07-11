@@ -5,6 +5,6 @@ export const bullMQConnection = {
   port: Number(redisUrl.port) || 6379,
   username: redisUrl.username || undefined,
   password: redisUrl.password || undefined,
-  tls: process.env.REDIS_URL?.startsWith("redis://") ? {} : undefined,
+  tls: process.env.REDIS_URL?.startsWith("rediss://") ? {} : undefined,
   maxRetriesPerRequest: null,
 };
