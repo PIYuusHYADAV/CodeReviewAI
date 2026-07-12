@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-
+import { TypingCommentProps } from "../../lib/type";
 const BOT_COMMENTS = [
   {
     file: "authController.ts",
@@ -28,7 +28,7 @@ const BOT_COMMENTS = [
   },
 ];
 
-function TypingComment({ comment, delay }) {
+function TypingComment({ comment, delay }: TypingCommentProps) {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), delay);

@@ -16,3 +16,18 @@ export type GitHubRepo = {
   html_url: string;
   private: boolean;
 };
+export type Severity = "critical" | "warning" | "info";
+
+export interface BotComment {
+  file: string;
+  line: number;
+  severity: Severity;
+  icon: string;
+  label: string;
+  message: string;
+}
+
+export interface TypingCommentProps {
+  comment: BotComment;
+  delay: number;
+}
