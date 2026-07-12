@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { TypingCommentProps } from "../../lib/type";
-const BOT_COMMENTS = [
+import { BotComment, TypingCommentProps } from "../../lib/type";
+const BOT_COMMENTS: BotComment[] = [
   {
     file: "authController.ts",
     line: 47,
