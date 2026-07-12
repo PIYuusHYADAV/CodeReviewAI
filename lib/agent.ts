@@ -144,3 +144,32 @@ export async function runArchitectureAgent(
     return { agent: "architecture", findings: [] };
   }
 }
+export async function compressFileContent(
+  filename: string,
+  content: string,
+  patch: string,
+): Promise<string> {
+  if (content.length < 3000) return content;
+  try {
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        {
+          role: "system",
+          content: `You are a code summarizer. Given a file and its diff, extract only the most relevant parts for code review — class definitions, method signatures, changed logic, imports. Remove boilerplate, comments, and unchanged simple code. Keep the output under 2000 characters.`,
+        },
+        {
+          role: "user",
+          content: `File: ${filename}\n\nDiff:\n${patch}\n\nFull content:\n${content.slice(0, 8000)}`,
+        },
+      ],
+      temperature: 0.1,
+    });
+    return completion.choices[0]?.message?.content ?? content.slice(0, 3000);
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(error.message);
+    }
+    throw new Error("Unidentified Error");
+  }
+}

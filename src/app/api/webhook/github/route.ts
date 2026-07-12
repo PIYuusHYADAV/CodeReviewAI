@@ -31,6 +31,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true });
       }
       const { number, head, base, title } = payload.pull_request;
+      if (
+        title.toLowerCase().includes("[wip]") ||
+        title.toLowerCase().includes("[skip-review]") ||
+        title.toLowerCase().startsWith("wip:") ||
+        title.toLowerCase().startsWith("draft:")
+      ) {
+        console.log("Skipping review for:", title);
+        return NextResponse.json({ ok: true, message: "Review skipped" });
+      }
+
       const installationId = payload.installation?.id;
       const repo = payload.repository.full_name;
       const commitSha = head.sha;

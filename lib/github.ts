@@ -29,7 +29,7 @@ export async function postPlaceHolderComment(
       owner,
       repo: repoName,
       issue_number: prNumber,
-      body: `## 🤖 CodeReview AI\n\n⏳ **Review in progress...**\n\nRunning 4 specialized agents in parallel:\n\n- 🔒 Security\n- ⚡ Performance\n- ✏️ Style\n- 🏛️ Architecture\n\n_This comment will be displayed with findings shortly._`,
+      body: `## 🤖 CodeReview AI\n\n⏳ **Review in progress...**\n\nRunning 4 specialized agents in parallel:\n\n- 🔒 Security\n- ⚡ Performance\n- ✏️ Style\n- 🏛️ Architecture\n\n_This comment will be displayed with findings shortly._\n For best result modularize your code upto the best.`,
     });
     return data.id;
   } catch (error) {

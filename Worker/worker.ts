@@ -13,10 +13,10 @@ import {
   runPerformanceAgent,
   runArchitectureAgent,
   runStyleAgent,
+  compressFileContent,
 } from "../lib/agent";
 import { runAggregator } from "../lib/aggregator";
 import http from "http";
-
 
 const PORT = process.env.PORT || 3001;
 http
@@ -53,14 +53,24 @@ async function processReview(job: Job) {
     contentLength: f.content.length,
     content: f.content,
   }));
-  console.log(`total files ${fileMetadata.length}`);
+  const compressedFiles = await Promise.all(
+    fileMetadata.map(async (f) => ({
+      ...f,
+      content: await compressFileContent(
+        f.filename,
+        f.content,
+        diff.find((d) => d.filename === f.filename)?.patch ?? "",
+      ),
+    })),
+  );
+  console.log(`total files ${compressedFiles.length}`);
 
   const [securityResult, performanceResult, styleResult, architectureResult] =
     await Promise.all([
       runSecurityAgent(diff, title),
       runPerformanceAgent(diff, title),
       runStyleAgent(diff, title),
-      runArchitectureAgent(diff, fileMetadata, title),
+      runArchitectureAgent(diff, compressedFiles, title),
     ]);
   const review = await runAggregator(
     [securityResult, performanceResult, styleResult, architectureResult],
