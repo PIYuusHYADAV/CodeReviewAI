@@ -18,7 +18,27 @@ export type PullRequestDetails = {
   headBranch: string;
 };
 let privateKey: string;
-
+export async function postPlaceHolderComment(
+  repo: string,
+  prNumber: number,
+  octokit: Octokit,
+): Promise<number> {
+  try {
+    const [owner, repoName] = repo.split("/");
+    const { data } = await octokit.issues.createComment({
+      owner,
+      repo: repoName,
+      issue_number: prNumber,
+      body: `## 🤖 CodeReview AI\n\n⏳ **Review in progress...**\n\nRunning 4 specialized agents in parallel:\n\n- 🔒 Security\n- ⚡ Performance\n- ✏️ Style\n- 🏛️ Architecture\n\n_This comment will be updated with findings shortly._`,
+    });
+    return data.id;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(error.message);
+    }
+    throw new Error("Unidentified Error");
+  }
+}
 export async function getOctokit(installationId: number): Promise<Octokit> {
   console.log(installationId);
   const pemPath = path.resolve(

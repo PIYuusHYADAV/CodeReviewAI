@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { reviewQueue } from "../../../../../lib/queue";
-import { getOctokit } from "../../../../../lib/github";
+import { getOctokit, postPlaceHolderComment } from "../../../../../lib/github";
 export async function POST(req: NextRequest) {
   try {
     const rawbody = await req.text();
@@ -35,6 +35,9 @@ export async function POST(req: NextRequest) {
       const repo = payload.repository.full_name;
       const commitSha = head.sha;
       const jobId = `${repo.replace("/", "-")}--${number}--${commitSha}`;
+      const octokit = await getOctokit(installationId);
+      const commentId = await postPlaceHolderComment(repo, number, octokit);
+      console.log("AI started working", commentId);
       console.log("=====================JOBID=============");
       console.log(jobId);
       await reviewQueue.add(
