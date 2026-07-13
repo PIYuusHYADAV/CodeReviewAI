@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { reviewQueue } from "../../../../../lib/queue";
-import { getOctokit, postPlaceHolderComment } from "../../../../../lib/github";
+import {
+  createCheckRun,
+  getOctokit,
+  postPlaceHolderComment,
+} from "../../../../../lib/github";
 export async function POST(req: NextRequest) {
   try {
     const rawbody = await req.text();
@@ -46,8 +50,13 @@ export async function POST(req: NextRequest) {
       const commitSha = head.sha;
       const jobId = `${repo.replace("/", "-")}--${number}--${commitSha}`;
       const octokit = await getOctokit(installationId);
-      const commentId = await postPlaceHolderComment(repo, number, octokit);
+      const [commentId, checkRunId] = await Promise.all([
+        postPlaceHolderComment(repo, number, octokit),
+        createCheckRun(repo, commitSha, octokit),
+      ]);
+
       console.log("AI started working", commentId);
+      console.log("check_Run_Created", checkRunId);
       console.log("=====================JOBID=============");
       console.log(jobId);
       await reviewQueue.add(
@@ -59,6 +68,8 @@ export async function POST(req: NextRequest) {
           basesha: base.sha,
           title,
           installationId,
+
+          checkRunId,
         },
         { jobId },
       );

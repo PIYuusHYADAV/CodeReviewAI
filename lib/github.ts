@@ -2,7 +2,7 @@ import { Octokit } from "@octokit/rest";
 import { createAppAuth } from "@octokit/auth-app";
 import fs from "fs";
 import path from "path";
-
+import { AggregatorReview, runAggregator } from "./aggregator";
 export type PRFile = {
   filename: string;
   status: string;
@@ -18,6 +18,83 @@ export type PullRequestDetails = {
   headBranch: string;
 };
 let privateKey: string;
+export async function createCheckRun(
+  repo: string,
+  commitSha: string,
+  octokit: Octokit,
+): Promise<number> {
+  try {
+    const [owner, reponame] = repo.split("/");
+    const { data } = await octokit.checks.create({
+      owner,
+      repo: reponame,
+      name: "CodeReview AI",
+      head_sha: commitSha,
+      status: "in_progress",
+      started_at: new Date().toISOString(),
+      output: {
+        title: "⏳ Review in progress..",
+        summary:
+          "Running 4 specialized agents — 🔒 Security · ⚡ Performance · ✏️ Style · 🏛️ Architecture",
+      },
+    });
+    return data.id;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(error.message);
+    }
+    throw new Error("Unidentified Error");
+  }
+}
+export async function updateCheckRun(
+  repo: string,
+  checkRunId: number,
+  review: AggregatorReview,
+  octokit: Octokit,
+) {
+  try {
+    const [owner, repoName] = repo.split("/");
+    const criticalCount = review.findings.filter(
+      (f) => f.severity === "critical",
+    ).length;
+    const warningCount = review.findings.filter(
+      (f) => f.severity === "warning",
+    ).length;
+    const infoCount = review.findings.filter(
+      (f) => f.severity === "info",
+    ).length;
+    const passed = review.overallScore >= 7 && criticalCount == 0;
+    const conclusion =
+      criticalCount > 0
+        ? "failure"
+        : review.overallScore >= 7
+          ? "success"
+          : "neutral";
+    await octokit.checks.update({
+      owner,
+      repo: repoName,
+      check_run_id: checkRunId,
+      status: "completed",
+      conclusion,
+      completed_at: new Date().toISOString(),
+      output: {
+        title: `Score: ${review.overallScore}/10 — ${criticalCount} critical · ${warningCount} warnings · ${infoCount} info`,
+        summary: review.summary,
+        text: review.findings
+          .map(
+            (f) =>
+              `**[${f.severity.toUpperCase()}]** \`${f.file}${f.line ? `:${f.line}` : ""}\` — ${f.message}`,
+          )
+          .join("\n\n"),
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(error.message);
+    }
+    throw new Error("Unidentified Error");
+  }
+}
 export async function postPlaceHolderComment(
   repo: string,
   prNumber: number,

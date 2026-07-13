@@ -7,6 +7,7 @@ import {
   postPRComment,
   postInlineComment,
   getOctokit,
+  updateCheckRun,
 } from "../lib/github";
 import {
   runSecurityAgent,
@@ -29,7 +30,8 @@ http
   });
 async function processReview(job: Job) {
   console.log(job.data);
-  const { repo, prNumber, commitSha, title, installationId } = job.data;
+  const { repo, prNumber, commitSha, title, installationId, checkRunId } =
+    job.data;
   console.log("Installation iD====================", installationId);
   const octokit = await getOctokit(installationId);
   console.log(`\n[Worker] Processing PR #${prNumber} in ${repo}`);
@@ -103,6 +105,7 @@ async function processReview(job: Job) {
       ),
     ),
   );
+  await updateCheckRun(repo, checkRunId, review, octokit);
   console.log(`✓ ${inlineFindings.length} inline comments posted`);
 }
 const worker = new Worker("review-queue", processReview, {
