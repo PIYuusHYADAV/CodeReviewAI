@@ -1,5 +1,11 @@
 const redisUrl = new URL(process.env.REDIS_URL!);
-
+console.log(
+  "[Redis] Connecting to:",
+  redisUrl.hostname,
+  redisUrl.port,
+  "db-context:",
+  process.env.REDIS_URL,
+);
 export const bullMQConnection = {
   host: redisUrl.hostname,
   port: Number(redisUrl.port) || 6379,

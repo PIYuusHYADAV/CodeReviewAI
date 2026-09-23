@@ -31,17 +31,27 @@ function safeParseFindings(raw: string): Finding[] {
 export async function runSecurityAgent(
   diff: PRFile[],
   prTitle: string,
+  fileMetadata: {
+    filename: string;
+
+    status: string;
+    contentLength: number;
+    content: string;
+  }[],
 ): Promise<AgentResult> {
   const diffContext = buildDiffContext(diff);
+  const context = fileMetadata
+    .map((f) => `### ${f.filename}\n${f.content}`)
+    .join("\n\n");
 
   try {
     const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-20b",
       messages: [
         { role: "system", content: SECURITY_PROMPT },
         {
           role: "user",
-          content: `PR Title: ${prTitle}\n\nDiff:\n${diffContext}`,
+          content: `PR Title: ${prTitle}\n\nDiff:\n${diffContext}\nFull file context:\n${context}`,
         },
       ],
       temperature: 0.2,
@@ -57,18 +67,29 @@ export async function runSecurityAgent(
 
 export async function runPerformanceAgent(
   diff: PRFile[],
+
   prTitle: string,
+  fileMetadata: {
+    filename: string;
+
+    status: string;
+    contentLength: number;
+    content: string;
+  }[],
 ): Promise<AgentResult> {
   const diffContext = buildDiffContext(diff);
+  const context = fileMetadata
+    .map((f) => `### ${f.filename}\n${f.content}`)
+    .join("\n\n");
 
   try {
     const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-20b",
       messages: [
         { role: "system", content: PERFORMANCE_PROMPT },
         {
           role: "user",
-          content: `PR Title: ${prTitle}\n\nDiff:\n${diffContext}`,
+          content: `PR Title: ${prTitle}\n\nDiff:\n${diffContext}\nFull file context:\n${context}`,
         },
       ],
       temperature: 0.2,
@@ -90,7 +111,7 @@ export async function runStyleAgent(
 
   try {
     const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-20b",
       messages: [
         { role: "system", content: STYLE_PROMPT },
         {
@@ -126,7 +147,7 @@ export async function runArchitectureAgent(
       .join("\n\n");
 
     const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-20b",
       messages: [
         { role: "system", content: ARCHITECTURE_PROMPT },
         {
@@ -152,7 +173,7 @@ export async function compressFileContent(
   if (content.length < 3000) return content;
   try {
     const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-20b",
       messages: [
         {
           role: "system",

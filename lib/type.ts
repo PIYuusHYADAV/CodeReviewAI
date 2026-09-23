@@ -31,3 +31,15 @@ export interface TypingCommentProps {
   comment: BotComment;
   delay: number;
 }
+
+export interface ReviewResult {
+  overallScore: number;
+  summary: string;
+  findings: unknown[];
+  breakdown: {
+    security: number;
+    performance: number;
+    style: number;
+    architecture: number;
+  };
+}

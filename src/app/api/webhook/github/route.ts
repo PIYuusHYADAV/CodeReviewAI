@@ -1,34 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
+
 import { reviewQueue } from "../../../../../lib/queue";
 import {
   createCheckRun,
   getOctokit,
   postPlaceHolderComment,
+  updateCheckRun,
 } from "../../../../../lib/github";
+
+import { insertData, updateStatus } from "../../../../../repository/dbrepo";
+import { checkKey, getCachedResult } from "../../../../../utils/redisutils";
+import { AggregatorReview } from "../../../../../lib/aggregator";
+
 export async function POST(req: NextRequest) {
   try {
-    const rawbody = await req.text();
-    const signature = req.headers.get("x-hub-signature-256") ?? "";
-    console.log("THis is the signature=", signature);
-    console.log("____+++++++++++++++++++++_______");
-    console.log("this is the raw body= ", rawbody);
-    console.log("Webhook Secret:", process.env.WEBHOOK_SECRET);
-    console.log("Received Signature:", signature);
-    // console.log("Computed Signature:", digest);
-    console.log("Length Received:", Buffer.from(signature).length);
-    // console.log("Length Computed:", Buffer.from(digest).length);
-    const hmac = crypto.createHmac("sha256", process.env.WEBHOOK_SECRET!);
-
-    const digest = "sha256=" + hmac.update(rawbody).digest("hex");
-    if (!crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(signature))) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    }
-
+    const encodedBody = req.headers.get("x-verified-body") ?? "";
+    const rawbody = Buffer.from(encodedBody, "base64").toString("utf-8");
     const payload = JSON.parse(rawbody);
     const event = req.headers.get("x-github-event");
-    console.log("==============EVENT===========");
-    console.log(event);
+
     if (event === "pull_request") {
       const action = payload.action;
       if (!["opened", "synchronize"].includes(action)) {
@@ -48,51 +38,89 @@ export async function POST(req: NextRequest) {
       const installationId = payload.installation?.id;
       const repo = payload.repository.full_name;
       const commitSha = head.sha;
-      const jobId = `${repo.replace("/", "-")}--${number}--${commitSha}`;
+
       const octokit = await getOctokit(installationId);
+      const { data: commit } = await octokit.git.getCommit({
+        owner: repo.split("/")[0],
+        repo: repo.split("/")[1],
+        commit_sha: commitSha,
+      });
+      const treeSha = commit.tree.sha;
+      const eventKey = `${repo}--${treeSha}`;
       const [commentId, checkRunId] = await Promise.all([
         postPlaceHolderComment(repo, number, octokit),
         createCheckRun(repo, commitSha, octokit),
       ]);
+      if (await checkKey(eventKey)) {
+        const res = await getCachedResult(eventKey);
 
-      console.log("AI started working", commentId);
-      console.log("check_Run_Created", checkRunId);
-      console.log("=====================JOBID=============");
-      console.log(jobId);
-      await reviewQueue.add(
-        "review-pr",
-        {
-          repo,
-          prNumber: number,
-          commitSha,
-          basesha: base.sha,
-          title,
-          installationId,
-
-          checkRunId,
-        },
-        { jobId },
+        await updateCheckRun(repo, checkRunId, res, octokit);
+        return NextResponse.json({ ok: true, cached: true, eventKey });
+      }
+      const result = await insertData(
+        repo,
+        treeSha,
+        number,
+        commitSha,
+        base.sha,
+        title,
+        installationId,
+        checkRunId,
       );
+      if (result?.status == "completed" && result?.data) {
+        await updateCheckRun(
+          repo,
+          checkRunId,
+          result.data as AggregatorReview,
+          octokit,
+        );
+        return NextResponse.json({
+          ok: true,
+          cached: true,
+          source: "postgres",
+        });
+      } else if (result?.status == "processing") {
+        return NextResponse.json({
+          ok: true,
+          message: "Request is already queued",
+          status: "processing",
+        });
+      }
+
+      const jobId = `${repo}--${treeSha}`;
+      console.log("add in queue", jobId);
+      Promise.all([
+        reviewQueue.add(
+          "review-pr",
+          {
+            repo,
+            prNumber: number,
+            commitSha,
+            basesha: base.sha,
+            title,
+            installationId,
+
+            checkRunId,
+          },
+          { jobId },
+        ),
+        updateStatus(repo, treeSha),
+      ]);
+
       return NextResponse.json({ ok: true, jobId });
-    }
-    if (event === "issue_comment") {
-      console.log("FULL PAYLOAD KEYS:", Object.keys(payload));
-      console.log("comment:", payload.comment);
-      console.log("issue:", payload.issue);
-      console.log("repository:", payload.repository);
-      console.log("installation:", payload.installation);
+    } else if (event === "issue_comment") {
       const action = payload.action;
       const comment = payload.comment.body.trim();
       const sender = payload.comment.user.login;
       const isPR = payload.issue.pull_request;
-      if (
-        action !== "created" ||
-        !isPR ||
-        comment !== "/review" ||
-        sender.includes("[bot]")
-      ) {
+      if (sender.includes("aicodereview001[bot]")) {
+        return NextResponse.json({ ok: true, message: "Ignored bot comment" });
+      }
+
+      if (action !== "created" || !isPR || comment !== "/review") {
         return NextResponse.json({ ok: true, message: "Ignored Comment" });
       }
+
       const repo = payload.repository.full_name;
 
       const prNumber = payload.issue.number;
@@ -111,7 +139,7 @@ export async function POST(req: NextRequest) {
         });
       }
       const octokit = await getOctokit(installationId);
-      console.log(octokit);
+
       const { data: pr } = await octokit.pulls.get({
         owner: repo.split("/")[0],
         repo: repo.split("/")[1],
@@ -134,8 +162,7 @@ export async function POST(req: NextRequest) {
       );
 
       return NextResponse.json({ ok: true, jobId, trigger: "manual" });
-    }
-    if (event !== "pull_request" && event !== "issue_comment") {
+    } else {
       return NextResponse.json({
         message:
           "The following PR is neither a pull request or a issue comment",
@@ -143,6 +170,7 @@ export async function POST(req: NextRequest) {
       });
     }
   } catch (e) {
+    console.log(e);
     if (e instanceof Error) {
       throw new Error(e.message);
     }

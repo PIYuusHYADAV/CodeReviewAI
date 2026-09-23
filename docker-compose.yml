@@ -8,6 +8,17 @@ services:
       - redis-data:/data
     command: redis-server --appendonly yes
     restart: unless-stopped
-
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: Piyush
+      POSTGRES_PASSWORD: Piyush1234
+      POSTGRES_DB: ProviderDetails
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
 volumes:
   redis-data:
+  pgdata:
