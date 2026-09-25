@@ -1,7 +1,7 @@
-import { Queue, QueueEvents } from "bullmq";
-import { bullMQConnection } from "./redis";
+import { Queue } from "bullmq";
+import { getBullMQConnection } from "./redis";
 export const reviewQueue = new Queue("review-queue", {
-  connection: bullMQConnection,
+  connection: getBullMQConnection(),
   defaultJobOptions: {
     attempts: 5,
     backoff: {

@@ -1,8 +1,9 @@
-import { db } from "../config";
+import { getDb } from "../config";
 import { userCredentials } from "../config/db/schema";
 import { eq, and, sql, or } from "drizzle-orm";
 import { ReviewResult } from "../lib/type";
 import { setCachedResult } from "../utils/redisutils";
+
 export async function insertData(
   data: string,
   treesha: string,
@@ -18,6 +19,7 @@ export async function insertData(
       console.log("Missing repo identifier");
       return null;
     }
+    const db = getDb();
 
     const [existing] = await db
       .select()
@@ -76,6 +78,7 @@ export async function updateData(
   findings: ReviewResult,
 ) {
   try {
+    const db = getDb();
     const res = await db
       .update(userCredentials)
       .set({
@@ -97,6 +100,7 @@ export async function updateData(
 }
 export async function updateStatus(data: string, treesha: string) {
   try {
+    const db = getDb();
     const res = await db
       .update(userCredentials)
       .set({

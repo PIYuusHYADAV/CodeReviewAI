@@ -1,5 +1,5 @@
 import { Worker, Job } from "bullmq";
-import { bullMQConnection } from "../lib/redis";
+import { getBullMQConnection } from "../lib/redis";
 import {
   getDiffPr,
   getPrDetails,
@@ -22,8 +22,9 @@ import http from "http";
 import { updateData } from "../repository/dbrepo";
 import { setCachedResult } from "../utils/redisutils";
 import { userCredentials } from "../config/db/schema";
-import { db } from "../config";
+import { getDb } from "../config";
 import { and, eq } from "drizzle-orm";
+
 const PORT = process.env.PORT || 3001;
 http
   .createServer((req, res) => {
@@ -34,6 +35,7 @@ http
     console.log(`[Worker] Health check server on port ${PORT}`);
   });
 async function processReview(job: Job) {
+  const db = getDb();
   const treesha = job.id?.split("--").pop();
 
   if (treesha === undefined) {
@@ -147,7 +149,7 @@ async function processReview(job: Job) {
   console.log(`✓ ${inlineFindings.length} inline comments posted`);
 }
 const worker = new Worker("review-queue", processReview, {
-  connection: bullMQConnection,
+  connection: getBullMQConnection(),
   concurrency: 3,
 });
 
@@ -164,6 +166,7 @@ worker.on("failed", async (job, err) => {
   if (job.attemptsMade < maxAttempts) return;
   const [repo, treesha] = job.id!.split("--");
   try {
+    const db = getDb();
     await db
       .update(userCredentials)
       .set({ status: "failed" })
