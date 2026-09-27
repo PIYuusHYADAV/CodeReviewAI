@@ -105,6 +105,7 @@ export async function updateStatus(data: string, treesha: string) {
       .update(userCredentials)
       .set({
         status: "processing",
+        updatedAt: new Date(),
       })
       .where(
         and(
