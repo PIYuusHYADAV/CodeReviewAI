@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
       }
 
       const jobId = `${repo}--${treeSha}`;
-      console.log("add in queue", jobId);
+
       Promise.all([
         reviewQueue.add(
           "review-pr",
@@ -145,18 +145,26 @@ export async function POST(req: NextRequest) {
         repo: repo.split("/")[1],
         pull_number: prNumber,
       });
-
       const commitSha = pr.head.sha;
-      const jobId = `${repo}--${prNumber}--${commitSha}--manual`;
+      const { data: commit } = await octokit.git.getCommit({
+        owner: repo.split("/")[0],
+        repo: repo.split("/")[1],
+        commit_sha: commitSha,
+      });
+
+      const checkRunId = await createCheckRun(repo, commitSha, octokit);
+      const treeSha = commit.tree.sha;
+      const jobId = `${repo}--${treeSha}`;
       await reviewQueue.add(
         "review-pr",
         {
           repo,
           prNumber,
           commitSha,
-          baseSha: pr.base.sha,
+          basesha: pr.base.sha,
           title: pr.title,
           installationId,
+          checkRunId,
         },
         { jobId },
       );
