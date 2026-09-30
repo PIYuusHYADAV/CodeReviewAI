@@ -151,6 +151,7 @@ async function processReview(job: Job) {
 const worker = new Worker("review-queue", processReview, {
   connection: getBullMQConnection(),
   concurrency: 3,
+  drainDelay: 10,
 });
 
 worker.on("completed", (job) => {
