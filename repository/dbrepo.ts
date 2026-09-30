@@ -1,6 +1,6 @@
 import { getDb } from "../config";
 import { userCredentials } from "../config/db/schema";
-import { eq, and, sql, or } from "drizzle-orm";
+import { eq, and, sql, lt, gt } from "drizzle-orm";
 import { ReviewResult } from "../lib/type";
 import { setCachedResult } from "../utils/redisutils";
 
@@ -116,6 +116,61 @@ export async function updateStatus(data: string, treesha: string) {
     return res;
   } catch (error) {
     console.log("Database Error", error);
+    return null;
+  }
+}
+async function retrieveAllHoldingData() {
+  try {
+    const db = getDb();
+    const threshold_Time = 24 * 60 * 60 * 1000;
+    const staleDataTime = new Date(Date.now() - threshold_Time);
+    const res = await db
+      .select()
+      .from(userCredentials)
+      .where(
+        and(
+          eq(userCredentials.status, "processing"),
+          lt(userCredentials.updatedAt, staleDataTime),
+        ),
+      );
+    return res;
+  } catch (e) {
+    throw new Error("database Error Occured for fetching the stale data");
+  }
+}
+async function filterOutSupressedRows(
+  staleRows: (typeof userCredentials.$inferSelect)[],
+) {
+  try {
+    const db = getDb();
+    const realData = [];
+    for (const row of staleRows) {
+      const [newrow] = await db
+        .select()
+        .from(userCredentials)
+        .where(
+          and(
+            eq(userCredentials.userinfo, row.userinfo),
+            eq(userCredentials.prNumber, row.prNumber),
+            gt(userCredentials.createdAt, row.createdAt),
+          ),
+        )
+        .limit(1);
+      if (!newrow) realData.push(row);
+    }
+    return realData;
+  } catch (e) {
+    throw new Error("Error in suppressing the data");
+  }
+}
+export async function returieveTheFilteredData() {
+  try {
+    const data = await retrieveAllHoldingData();
+    if (!data) return null;
+    const freshData = await filterOutSupressedRows(data);
+    return freshData;
+  } catch (error) {
+    console.log("Encountered an error in fetching the stale data=", error);
     return null;
   }
 }
