@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-
+import {
+  manualReviewRateLimit,
+  prRepoRateLimit,
+  pullRequestRateLimit,
+} from "../../../../../lib/rateLimitSeq";
 import { reviewQueue } from "../../../../../lib/queue";
 import {
   createCheckRun,
@@ -45,6 +49,19 @@ export async function POST(req: NextRequest) {
         repo: repo.split("/")[1],
         commit_sha: commitSha,
       });
+
+      const [prLimit, repoLimit] = await Promise.all([
+        pullRequestRateLimit(repo, number),
+        prRepoRateLimit(repo),
+      ]);
+      if (prLimit.limited || repoLimit.limited) {
+        const retryAfter = Math.max(prLimit.retryAfter, repoLimit.retryAfter);
+        console.log(
+          `[RateLimit] Blocked PR event for ${repo}#${number}, retry in ${retryAfter}s`,
+        );
+        return NextResponse.json({ ok: true, message: "Rate limited" });
+      }
+
       const treeSha = commit.tree.sha;
       const eventKey = `${repo}--${treeSha}`;
       const [commentId, checkRunId] = await Promise.all([
@@ -138,6 +155,24 @@ export async function POST(req: NextRequest) {
           message: "Missing required fields",
         });
       }
+      const [reviewLimit, repoLimit] = await Promise.all([
+        manualReviewRateLimit(repo, prNumber),
+        prRepoRateLimit(repo),
+      ]);
+      if (reviewLimit.limited || repoLimit.limited) {
+        const retryAfter = Math.max(
+          reviewLimit.retryAfter,
+          repoLimit.retryAfter,
+        );
+        console.log(
+          `[RateLimit] Blocked /review for ${repo}#${prNumber}, retry in ${retryAfter}s`,
+        );
+        return NextResponse.json({
+          ok: true,
+          message: `Rate limited — please wait ${retryAfter}s before retrying /review`,
+        });
+      }
+
       const octokit = await getOctokit(installationId);
 
       const { data: pr } = await octokit.pulls.get({

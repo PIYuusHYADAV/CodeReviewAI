@@ -43,3 +43,8 @@ export interface ReviewResult {
     architecture: number;
   };
 }
+export type RateLimitResult = {
+  limited: boolean;
+  retryAfter: number;
+  remaining: number;
+};
