@@ -7,13 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "worker": "npx tsx Worker/index.ts --watch"
+    "worker": "npx tsx Worker/index.ts --watch",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@octokit/auth-app": "^8.2.0",
     "@octokit/rest": "^22.0.1",
-    "@upstash/ratelimit": "^2.2.0",
     "@upstash/redis": "^1.39.0",
     "bullmq": "^5.79.2",
     "crypto": "^1.0.1",
@@ -41,6 +42,7 @@
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "tsx": "^4.22.4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   }
 }
