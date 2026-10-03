@@ -1,26 +1,41 @@
 @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@import "tw-animate-css";
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: #06070c;
+  --color-card: #0e1019;
+  --color-ink: #eceef6;
+  --color-muted: #8a90a6;
+  --color-line: #1e2232;
+  --color-brand: #8b7bff;
+  --color-brand-soft: #1a1740;
+  --color-bad: #ff5d6c;
+  --color-good: #34d399;
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root { color-scheme: dark; }
+body { background: var(--color-paper); color: var(--color-ink); font-family: var(--font-body), system-ui, sans-serif; }
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(60% 40% at 85% -10%, #8b7bff33, transparent),
+    radial-gradient(45% 35% at 0% 25%, #34d39918, transparent);
 }
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+h1, h2, h3 { font-family: var(--font-display), system-ui, sans-serif; letter-spacing: -0.02em; }
+.font-mono { font-family: var(--font-code), ui-monospace, monospace; }
+:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 3px; }
+.grid-bg {
+  background-image: linear-gradient(var(--color-line) 1px, transparent 1px), linear-gradient(90deg, var(--color-line) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at 50% 0%, #000 30%, transparent 75%);
 }
+@keyframes sheen { to { background-position: 200% center; } }
+.sheen { background: linear-gradient(110deg, #fff0 30%, #ffffff30 50%, #fff0 70%) 0 0 / 200% 100%; animation: sheen 3.5s linear infinite; }
+@keyframes dash { to { stroke-dashoffset: -24; } }
+.flow-dash { animation: dash 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .sheen, .flow-dash { animation: none; } }
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-stopped { overflow: clip; }
+html { scroll-behavior: smooth; }
+html.lenis { scroll-behavior: auto; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

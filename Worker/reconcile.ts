@@ -28,7 +28,7 @@ async function reconcile() {
   }
   console.log(`[Reconcile] Found ${data.length} stale row(s) to requeue.`);
   for (const row of data) {
-    const jobId = `${row.userinfo}-${row.treesha}`;
+    const jobId = `${row.userinfo}--${row.treesha}`;
     try {
       await reviewQueue.add(
         "review-pr",
