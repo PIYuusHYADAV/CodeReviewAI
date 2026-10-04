@@ -94,7 +94,12 @@ export async function POST(req: NextRequest) {
           result.data as AggregatorReview,
           octokit,
         );
-        await postPRComment(repo, number, cachedComment(result.data), octokit);
+        await postPRComment(
+          repo,
+          number,
+          cachedComment(result.data as AggregatorReview),
+          octokit,
+        );
         return NextResponse.json({
           ok: true,
           cached: true,
