@@ -46,6 +46,7 @@ export async function createCheckRun(
     throw new Error("Unidentified Error");
   }
 }
+
 export async function updateCheckRun(
   repo: string,
   checkRunId: number,

@@ -9,12 +9,14 @@ import {
   createCheckRun,
   getOctokit,
   postPlaceHolderComment,
+  postPRComment,
   updateCheckRun,
 } from "../../../../../lib/github";
 
 import { insertData, updateStatus } from "../../../../../repository/dbrepo";
 import { checkKey, getCachedResult } from "../../../../../utils/redisutils";
 import { AggregatorReview } from "../../../../../lib/aggregator";
+import { cachedComment } from "../../../../../lib/utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -72,6 +74,7 @@ export async function POST(req: NextRequest) {
         const res = await getCachedResult(eventKey);
 
         await updateCheckRun(repo, checkRunId, res, octokit);
+        await postPRComment(repo, number, cachedComment(res), octokit);
         return NextResponse.json({ ok: true, cached: true, eventKey });
       }
       const result = await insertData(
@@ -91,6 +94,7 @@ export async function POST(req: NextRequest) {
           result.data as AggregatorReview,
           octokit,
         );
+        await postPRComment(repo, number, cachedComment(result.data), octokit);
         return NextResponse.json({
           ok: true,
           cached: true,
@@ -189,7 +193,8 @@ export async function POST(req: NextRequest) {
 
       const checkRunId = await createCheckRun(repo, commitSha, octokit);
       const treeSha = commit.tree.sha;
-      const jobId = `${repo}--${treeSha}`;
+      const jobId = `${repo}--m${Date.now()}--${treeSha}`;
+
       await reviewQueue.add(
         "review-pr",
         {
