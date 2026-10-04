@@ -2,8 +2,7 @@
 import { useState } from "react";
 import { Play } from "lucide-react";
 
-/* No autoplay: poster + play button. Paste a YouTube/Vimeo embed URL into VIDEO_URL once recorded. */
-const VIDEO_URL = "";
+const VIDEO_URL = process.env.NEXT_PUBLIC_VIDEO_URL ?? "";
 
 export function VideoSlot() {
   const [on, setOn] = useState(false);
