@@ -48,3 +48,24 @@ export type RateLimitResult = {
   retryAfter: number;
   remaining: number;
 };
+
+export type NewWaiter = {
+  prNumber: number;
+  commitsha: string;
+  checkRunId: number;
+  commentId?: number;
+};
+export type PRFile = {
+  filename: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  patch: string;
+};
+export type PullRequestDetails = {
+  title: string;
+  description: string;
+  author: string;
+  baseBranch: string;
+  headBranch: string;
+};

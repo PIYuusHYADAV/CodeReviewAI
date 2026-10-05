@@ -1,0 +1,1 @@
+ALTER TABLE "reviewWaiters" RENAME COLUMN "delievered_at" TO "delivered_at";

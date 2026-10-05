@@ -2,21 +2,9 @@ import { Octokit } from "@octokit/rest";
 import { createAppAuth } from "@octokit/auth-app";
 import fs from "fs";
 import path from "path";
-import { AggregatorReview, runAggregator } from "./aggregator";
-export type PRFile = {
-  filename: string;
-  status: string;
-  additions: number;
-  deletions: number;
-  patch: string;
-};
-export type PullRequestDetails = {
-  title: string;
-  description: string;
-  author: string;
-  baseBranch: string;
-  headBranch: string;
-};
+import { AggregatorReview } from "./aggregator";
+import { PRFile, PullRequestDetails } from "./type";
+
 let privateKey: string;
 export async function createCheckRun(
   repo: string,

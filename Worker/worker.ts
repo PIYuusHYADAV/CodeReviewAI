@@ -4,8 +4,6 @@ import {
   getDiffPr,
   getPrDetails,
   fileContents,
-  postPRComment,
-  postInlineComment,
   getOctokit,
   updateCheckRun,
 } from "../lib/github";
@@ -16,14 +14,21 @@ import {
   runStyleAgent,
   compressFileContent,
 } from "../lib/agent";
-import { getValidDiffLines } from "../utils/Validate";
+
 import { runAggregator } from "../lib/aggregator";
 import http from "http";
-import { updateData } from "../repository/dbrepo";
+import {
+  updateData,
+  getPendingWaiters,
+  claimWaiter,
+  markWaiterFailed,
+  failPendingWaiters,
+} from "../repository/dbrepo";
 import { setCachedResult } from "../utils/redisutils";
 import { userCredentials } from "../config/db/schema";
 import { getDb } from "../config";
 import { and, eq } from "drizzle-orm";
+import { publishReview } from "../lib/publish";
 
 const PORT = process.env.PORT || 3001;
 http
@@ -89,64 +94,50 @@ async function processReview(job: Job) {
     details.title,
   );
   console.log("Aggregations", runAggregator);
-
-  const inlineFindings: typeof review.findings = [];
-  const outOfDiffFindings: typeof review.findings = [];
-
-  for (const f of review.findings) {
-    if (!f.line) continue;
-
-    const filePatch = diff.find((d) => d.filename === f.file)?.patch;
-    const validLines = filePatch
-      ? getValidDiffLines(filePatch)
-      : new Set<number>();
-
-    if (validLines.has(f.line)) {
-      inlineFindings.push(f);
-    } else {
-      outOfDiffFindings.push(f);
-    }
-  }
-
-  let finalSummary = review.summary;
-  if (outOfDiffFindings.length > 0) {
-    finalSummary += `\n\n---\n\n### Additional findings (outside this PR's diff)\n\n`;
-    finalSummary += outOfDiffFindings
-      .map((f) => {
-        const emoji =
-          f.severity === "critical"
-            ? "🔴"
-            : f.severity === "warning"
-              ? "🟡"
-              : "🔵";
-        return `- ${emoji} **${f.severity.toUpperCase()}** — \`${f.file}${f.line ? `:${f.line}` : ""}\` — ${f.message}`;
-      })
-      .join("\n");
-  }
-  const inlineResults = await Promise.allSettled(
-    inlineFindings.map((f) =>
-      postInlineComment(
-        repo,
-        prNumber,
-        commitSha,
-        f.line!,
-        `${f.severity === "critical" ? "🔴" : f.severity === "warning" ? "🟡" : "🔵"} **${f.severity.toUpperCase()}** — ${f.message}`,
-        f.file,
-        octokit,
-      ),
-    ),
-  );
-
   await Promise.all([
-    updateCheckRun(repo, checkRunId, review, octokit),
-
     updateData(repo, treesha, review),
-
     setCachedResult(cachedKey, review),
   ]);
-  await postPRComment(repo, prNumber, finalSummary, octokit);
+  const count = await publishReview({
+    repo,
+    prNumber,
+    commitSha,
+    checkRunId,
+    review,
+    octokit,
+  });
+  const waiters = await getPendingWaiters(repo, treesha);
+  const seenPRs = new Set<number>([prNumber]);
+  await Promise.allSettled(
+    waiters.map(async (w) => {
+      const claimed = await claimWaiter(w.id);
+      if (!claimed) return;
+      try {
+        if (seenPRs.has(w.prNumber)) {
+          await updateCheckRun(repo, w.checkRunId, review, octokit);
+        } else {
+          seenPRs.add(w.prNumber);
+          await publishReview({
+            repo,
+            prNumber: w.prNumber,
+            commitSha: w.commitsha,
+            checkRunId: w.checkRunId,
+            review,
+            octokit,
+          });
+        }
+      } catch (e) {
+        await markWaiterFailed(
+          w.id,
+          e instanceof Error ? e.message : String(e),
+        );
+      }
+    }),
+  );
 
-  console.log(`✓ ${inlineFindings.length} inline comments posted`);
+  console.log(
+    `✓ ${count} inline comments, ${waiters.length} waiter(s) handled`,
+  );
 }
 const worker = new Worker("review-queue", processReview, {
   connection: getBullMQConnection(),
@@ -165,7 +156,9 @@ worker.on("failed", async (job, err) => {
   if (!job) return;
   const maxAttempts = job.opts.attempts ?? 1;
   if (job.attemptsMade < maxAttempts) return;
-  const [repo, treesha] = job.id!.split("--");
+  const parts = job.id!.split("--");
+  const repo = parts[0];
+  const treesha = parts[parts.length - 1];
   try {
     const db = getDb();
     await db
@@ -177,6 +170,7 @@ worker.on("failed", async (job, err) => {
           eq(userCredentials.treesha, treesha),
         ),
       );
+    await failPendingWaiters(repo, treesha, `Review failed: ${err.message}`);
     console.error(
       `Job ${job.id} permanently failed after ${job.attemptsMade} attempts — marked in DB`,
     );

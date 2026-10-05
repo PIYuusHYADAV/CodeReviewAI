@@ -1,0 +1,266 @@
+{
+  "id": "34542d7f-d90f-4acf-b165-68b246299b88",
+  "prevId": "994798eb-7f85-40fa-b1d9-f44164e12bdc",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.reviewWaiters": {
+      "name": "reviewWaiters",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "userinfo": {
+          "name": "userinfo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "treesha": {
+          "name": "treesha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prNumber": {
+          "name": "prNumber",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "commitsha": {
+          "name": "commitsha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checkRunId": {
+          "name": "checkRunId",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "commentId": {
+          "name": "commentId",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "delievered_at": {
+          "name": "delievered_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "waiters_lookup_idx": {
+          "name": "waiters_lookup_idx",
+          "columns": [
+            {
+              "expression": "userinfo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "treesha",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "waiters_review_fk": {
+          "name": "waiters_review_fk",
+          "tableFrom": "reviewWaiters",
+          "tableTo": "userCredentials",
+          "columnsFrom": [
+            "userinfo",
+            "treesha"
+          ],
+          "columnsTo": [
+            "userinfo",
+            "treesha"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unique_waiter": {
+          "name": "unique_waiter",
+          "nullsNotDistinct": false,
+          "columns": [
+            "userinfo",
+            "treesha",
+            "checkRunId"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.userCredentials": {
+      "name": "userCredentials",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "userinfo": {
+          "name": "userinfo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "treesha": {
+          "name": "treesha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prnumber": {
+          "name": "prnumber",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "commitsha": {
+          "name": "commitsha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "basesha": {
+          "name": "basesha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "installationId": {
+          "name": "installationId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checkRunId": {
+          "name": "checkRunId",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "data": {
+          "name": "data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unique_repo_treesha": {
+          "name": "unique_repo_treesha",
+          "nullsNotDistinct": false,
+          "columns": [
+            "userinfo",
+            "treesha"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

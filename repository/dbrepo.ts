@@ -1,9 +1,93 @@
 import { getDb } from "../config";
-import { userCredentials } from "../config/db/schema";
+import { userCredentials, reviewWaiters } from "../config/db/schema";
 import { eq, and, sql, lt, gt } from "drizzle-orm";
-import { ReviewResult } from "../lib/type";
+import { NewWaiter, ReviewResult } from "../lib/type";
 import { setCachedResult } from "../utils/redisutils";
-
+export async function registerWaiter(
+  repo: string,
+  treesha: string,
+  w: NewWaiter,
+) {
+  try {
+    const db = getDb();
+    await db
+      .insert(reviewWaiters)
+      .values({
+        userinfo: repo,
+        treesha,
+        prNumber: w.prNumber,
+        commitsha: w.commitsha,
+        checkRunId: w.checkRunId,
+        commentId: w.commentId,
+      })
+      .onConflictDoNothing({
+        target: [
+          reviewWaiters.userinfo,
+          reviewWaiters.treesha,
+          reviewWaiters.checkRunId,
+        ],
+      });
+    const [review] = await db
+      .select({ status: userCredentials.status, data: userCredentials.data })
+      .from(userCredentials)
+      .where(
+        and(
+          eq(userCredentials.userinfo, repo),
+          eq(userCredentials.treesha, treesha),
+        ),
+      );
+    return review ?? null;
+  } catch (error) {
+    console.log("Error in Registering new Waiter", error);
+    return null;
+  }
+}
+export async function getPendingWaiters(repo: string, treesha: string) {
+  const db = getDb();
+  return db
+    .select()
+    .from(reviewWaiters)
+    .where(
+      and(
+        eq(reviewWaiters.userinfo, repo),
+        eq(reviewWaiters.treesha, treesha),
+        eq(reviewWaiters.status, "pending"),
+      ),
+    );
+}
+export async function claimWaiter(id: string) {
+  const db = getDb();
+  const [row] = await db
+    .update(reviewWaiters)
+    .set({ status: "delivered", deliveredAt: new Date() })
+    .where(and(eq(reviewWaiters.id, id), eq(reviewWaiters.status, "pending")))
+    .returning();
+  return row ?? null;
+}
+export async function markWaiterFailed(id: string, error: string) {
+  const db = getDb();
+  await db
+    .update(reviewWaiters)
+    .set({ status: "failed", error })
+    .where(eq(reviewWaiters.id, id));
+}
+export async function failPendingWaiters(
+  repo: string,
+  treesha: string,
+  error: string,
+) {
+  const db = getDb();
+  await db
+    .update(reviewWaiters)
+    .set({ status: "failed", error })
+    .where(
+      and(
+        eq(reviewWaiters.userinfo, repo),
+        eq(reviewWaiters.treesha, treesha),
+        eq(reviewWaiters.status, "pending"),
+      ),
+    );
+}
 export async function insertData(
   data: string,
   treesha: string,

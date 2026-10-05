@@ -13,10 +13,18 @@ import {
   updateCheckRun,
 } from "../../../../../lib/github";
 
-import { insertData, updateStatus } from "../../../../../repository/dbrepo";
+import {
+  claimWaiter,
+  getPendingWaiters,
+  insertData,
+  markWaiterFailed,
+  registerWaiter,
+  updateStatus,
+} from "../../../../../repository/dbrepo";
 import { checkKey, getCachedResult } from "../../../../../utils/redisutils";
 import { AggregatorReview } from "../../../../../lib/aggregator";
 import { cachedComment } from "../../../../../lib/utils";
+import { publishReview } from "../../../../../lib/publish";
 
 export async function POST(req: NextRequest) {
   try {
@@ -72,10 +80,17 @@ export async function POST(req: NextRequest) {
       ]);
       if (await checkKey(eventKey)) {
         const res = await getCachedResult(eventKey);
-
-        await updateCheckRun(repo, checkRunId, res, octokit);
-        await postPRComment(repo, number, cachedComment(res), octokit);
-        return NextResponse.json({ ok: true, cached: true, eventKey });
+        if (res) {
+          await publishReview({
+            repo,
+            prNumber: number,
+            commitSha,
+            checkRunId,
+            review: res as AggregatorReview,
+            octokit,
+          });
+          return NextResponse.json({ ok: true, cached: true, eventKey });
+        }
       }
       const result = await insertData(
         repo,
@@ -88,28 +103,52 @@ export async function POST(req: NextRequest) {
         checkRunId,
       );
       if (result?.status == "completed" && result?.data) {
-        await updateCheckRun(
+        await publishReview({
           repo,
+          prNumber: number,
+          commitSha,
           checkRunId,
-          result.data as AggregatorReview,
+          review: result.data as AggregatorReview,
           octokit,
-        );
-        await postPRComment(
-          repo,
-          number,
-          cachedComment(result.data as AggregatorReview),
-          octokit,
-        );
+        });
         return NextResponse.json({
           ok: true,
           cached: true,
           source: "postgres",
         });
       } else if (result?.status == "processing") {
+        const review = await registerWaiter(repo, treeSha, {
+          prNumber: number,
+          commitsha: commitSha,
+          checkRunId,
+          commentId,
+        });
+        if (review?.status === "completed" && review.data) {
+          const pending = await getPendingWaiters(repo, treeSha);
+          const mine = pending.find((p) => p.checkRunId === checkRunId);
+          if (mine && (await claimWaiter(mine.id))) {
+            try {
+              await publishReview({
+                repo,
+                prNumber: number,
+                commitSha,
+                checkRunId,
+                review: review.data as AggregatorReview,
+                octokit,
+              });
+            } catch (e) {
+              await markWaiterFailed(
+                mine.id,
+                e instanceof Error ? e.message : String(e),
+              );
+            }
+          }
+          return NextResponse.json({ ok: true, served: "late-waiter" });
+        }
         return NextResponse.json({
           ok: true,
-          message: "Request is already queued",
           status: "processing",
+          waiting: true,
         });
       }
 
