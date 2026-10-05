@@ -148,8 +148,26 @@ export async function insertData(
           status: "pending",
           updatedAt: new Date(),
         },
+        setWhere: sql`${userCredentials.status} = 'failed'
+          OR (${userCredentials.status} IN ('processing', 'pending')
+              AND ${userCredentials.updatedAt} < now() - interval '15 minutes')`,
       })
+
       .returning();
+    if (!res) {
+      const [current] = await db
+        .select()
+        .from(userCredentials)
+        .where(
+          and(
+            eq(userCredentials.userinfo, data),
+            eq(userCredentials.treesha, treesha),
+          ),
+        );
+      if (current?.status === "completed" && current.data) return current;
+      return current ? { ...current, status: "processing" as const } : null;
+    }
+
     return res ?? null;
   } catch (error) {
     console.log("Database error", error);
