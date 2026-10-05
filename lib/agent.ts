@@ -1,6 +1,6 @@
 import Groq from "groq-sdk";
 import { AgentResult, Finding } from "./type";
-import { PRFile } from "./github";
+import { PRFile } from "./type";
 import {
   ARCHITECTURE_PROMPT,
   SECURITY_PROMPT,
