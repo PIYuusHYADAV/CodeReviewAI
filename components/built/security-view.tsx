@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
 
 import { BuiltExperience } from "./built-sim";
@@ -57,22 +56,14 @@ export function SecurityView({ seed }: { seed?: string }) {
             className="mt-6 inline-flex h-12 items-center gap-2 rounded-full border border-line bg-card px-6 text-sm font-medium transition-colors hover:border-brand hover:text-brand"
           >
             <SlidersHorizontal size={16} /> {open ? "Hide the simulator" : "Open the simulator"}
-            <ChevronDown size={16} className={`transition-transform duration-500 ${open ? "rotate-180" : ""}`} />
+            <ChevronDown size={16} className={`transition-transform ${open ? "rotate-180" : ""}`} />
           </button>
         </Reveal>
-        <AnimatePresence initial={false}>
-          {open && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-              className="overflow-hidden"
-            >
-              <div className="pt-12"><BuiltExperience initialSearch={seed} /></div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {open && (
+          <div className="pt-12">
+            <BuiltExperience initialSearch={seed} />
+          </div>
+        )}
       </section>
     </div>
   );

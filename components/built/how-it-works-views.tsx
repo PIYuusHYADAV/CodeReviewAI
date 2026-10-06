@@ -1,6 +1,5 @@
 "use client";
 import { useLayoutEffect, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { GitPullRequest, ShieldCheck } from "lucide-react";
 
 import { Simulation } from "../sim/simulation";
@@ -16,7 +15,6 @@ const TABS = [
 
 /* The visitor chooses the lens. Only the chosen view is mounted, so the two simulations never share URL state. */
 export function HowItWorksViews() {
-  const reduce = useReducedMotion();
   const [view, setView] = useState<View>("workflow");
   const [seed, setSeed] = useState("");
 
@@ -59,15 +57,11 @@ export function HowItWorksViews() {
               aria-controls="hiw-panel"
               tabIndex={on ? 0 : -1}
               onClick={() => choose(t.id)}
-              className="relative rounded-xl px-3 py-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/60 sm:px-5"
-            >
-              {on && (
-                <motion.span
-                  layoutId="hiw-pill"
-                  className="absolute inset-0 rounded-xl border border-brand/40 bg-brand-soft"
-                  transition={{ type: "spring", bounce: 0.18, duration: 0.5 }}
-                />
+              className={cn(
+                "relative rounded-xl border px-3 py-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/60 sm:px-5",
+                on ? "border-brand/40 bg-brand-soft" : "border-transparent hover:bg-card",
               )}
+            >
               <span className="relative flex items-center gap-2.5">
                 <t.icon size={20} aria-hidden className={cn("shrink-0", on ? "text-brand" : "text-muted")} />
                 <span>
@@ -80,29 +74,18 @@ export function HowItWorksViews() {
         })}
       </div>
 
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={view}
-          role="tabpanel"
-          id="hiw-panel"
-          aria-labelledby={`hiw-tab-${view}`}
-          initial={reduce ? false : { opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={reduce ? { opacity: 0 } : { opacity: 0, y: -10 }}
-          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-        >
-          {view === "workflow" ? (
-            <>
-              <Simulation ids={["journey"]} />
-              <div className="mt-28">
-                <Pipeline />
-              </div>
-            </>
-          ) : (
-            <SecurityView seed={seed} />
-          )}
-        </motion.div>
-      </AnimatePresence>
+      <div key={view} role="tabpanel" id="hiw-panel" aria-labelledby={`hiw-tab-${view}`} className="animate-in fade-in duration-300 motion-reduce:animate-none">
+        {view === "workflow" ? (
+          <>
+            <Simulation ids={["journey"]} />
+            <div className="mt-28">
+              <Pipeline />
+            </div>
+          </>
+        ) : (
+          <SecurityView seed={seed} />
+        )}
+      </div>
     </div>
   );
 }

@@ -3,7 +3,6 @@ import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "./provider";
 
-import { SmoothScroll } from "../../components/smooth-scroll";
 import { Nav } from "../../components/nav";
 const display = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -13,8 +12,16 @@ const body = Geist({ subsets: ["latin"], variable: "--font-body" });
 const code = Geist_Mono({ subsets: ["latin"], variable: "--font-code" });
 
 export const metadata: Metadata = {
-  title: "CodeReview AI",
-  description: "Four agents review every pull request the moment it opens.",
+  metadataBase: new URL("https://codequant-review.vercel.app"),
+  title: "CodeReview AI | Four AI agents review every pull request",
+  description:
+    "A production GitHub App: four parallel AI agents post inline review comments in seconds, backed by a queue, retries and deduplication.",
+  openGraph: {
+    title: "CodeReview AI",
+    description: "Four AI agents review every pull request in seconds.",
+    images: ["/screenshots/review.png"],
+  },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({
@@ -30,7 +37,6 @@ export default function RootLayout({
     >
       <body className="antialiased">
         <Providers>
-          <SmoothScroll />
           <Nav />
           {children}
         </Providers>

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { motion, useInView, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -18,7 +18,7 @@ import { cn } from "../../lib/utils";
 import { scenarios } from "./data";
 import { FlowStage } from "./flow-stage";
 
-/* Visitor-governed: loads paused at step 0. Autoplay is off until the visitor presses Play; any manual action stops it. */
+/* Visitor-governed: loads paused at step 0. Nothing plays until the visitor presses Play; any manual action stops it. */
 export function Simulation({ ids }: { ids?: string[] }) {
   const list_ = scenarios.filter((s) => !ids || ids.includes(s.id));
   const [sid, setSid] = useState(list_[0].id);
@@ -27,8 +27,6 @@ export function Simulation({ ids }: { ids?: string[] }) {
   const [copied, setCopied] = useState(false);
   const [playing, setPlaying] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const seen = useInView(rootRef, { once: true, amount: 0.45 });
-  const reduce = useReducedMotion();
   const sc = list_.find((s) => s.id === sid)!;
   const last = sc.steps.length - 1;
   const cur = sc.steps[step];
@@ -45,12 +43,6 @@ export function Simulation({ ids }: { ids?: string[] }) {
   useEffect(() => {
     window.history.replaceState(null, "", `?s=${sid}&step=${step}`);
   }, [sid, step]);
-  /* Plays itself once when scrolled into view; any manual action stops it. */
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (seen && !reduce && step === 0) setPlaying(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seen]);
   useEffect(() => {
     if (!playing) return;
     const t = setInterval(
@@ -128,7 +120,7 @@ export function Simulation({ ids }: { ids?: string[] }) {
         </div>
       )}
       <p className="relative mt-3 text-sm text-muted">
-        {sc.blurb} Plays once as you scroll to it; pause or step through any time. A walkthrough of the real system, not live traffic.
+        {sc.blurb} Press Play, or step through it yourself. A walkthrough of the real system, not live traffic.
       </p>
 
       <div className="relative mt-6">

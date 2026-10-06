@@ -1,332 +1,203 @@
-# CodeReview AI 🤖
+# CodeReview AI
 
-An AI-powered GitHub bot that automatically reviews pull requests using **4 specialized LLM agents running in parallel** — catching security vulnerabilities, performance issues, style problems, and architecture concerns before code gets merged.
+[![CI](https://github.com/PIYuusHYADAV/CodeReviewAI/actions/workflows/ci.yml/badge.svg)](https://github.com/PIYuusHYADAV/CodeReviewAI/actions/workflows/ci.yml)
+![Next.js 16](https://img.shields.io/badge/Next.js-16-black)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
+![Tests](https://img.shields.io/badge/tests-27%20cases-34d399)
 
-Built with Next.js, BullMQ, Redis, Groq, and Gemini 2.5 Flash. Integrates as a **GitHub App** so reviews appear as `aicodereview001[bot]` comments and GitHub Check Runs directly on PRs.
+A GitHub App that reviews every pull request with **four specialized LLM agents running in parallel**, then posts the findings as inline comments on the exact changed lines plus a scored GitHub Check Run, usually within seconds.
 
-> ### 🔗 [**Install the app → github.com/apps/aicodereview001**](https://github.com/apps/aicodereview001)
->
-> Add it to any repo and it starts reviewing new PRs automatically — no setup on your end required.
+**[▶ Watch the 3-minute demo and see the live site](https://codequant-review.vercel.app/)** · **[Install the app](https://github.com/apps/aicodereview001)**
 
----
+![A CodeReview AI comment on a pull request](public/screenshots/review.png)
 
-## What You Get on Every PR
+## Contents
 
-**1. Instant placeholder comment** — appears within 2 seconds of opening a PR:
+[Why this project](#why-this-project) · [Demo](#demo) · [What it does](#what-it-does) · [Architecture](#architecture) · [Key design decisions](#key-design-decisions) · [Fault tolerance](#fault-tolerance) · [Tech stack](#tech-stack) · [Setup](#run-it-locally) · [Deploy](#deployment) · [Testing](#testing) · [Limitations and roadmap](#limitations-and-roadmap)
 
-```
-🤖 CodeReview AI
+## Why this project
 
-⏳ Review in progress...
+Code review is slow and inconsistent: reviewers miss secrets and injection bugs, and authors wait hours for feedback. Most "AI review" demos are a single prompt behind a button. This project treats it as a **production system**: a signed webhook, a queue, idempotent processing, retries, isolated agents and a tested failure path, so a bad LLM response or a crashed worker never loses or duplicates a review.
 
-Running 4 specialized agents in parallel:
-- 🔒 Security
-- ⚡ Performance
-- ✏️ Style
-- 🏛️ Architecture
+## Demo
 
-This comment will be updated with findings shortly.
-```
+- **Video:** a 3-minute walkthrough of install, opening a PR, the review landing and re-running with `/review` is on the [live site](https://codequant-review.vercel.app/).
+- **Try it yourself:** install the [GitHub App](https://github.com/apps/aicodereview001) on a test repo, open a pull request, or comment `/review` on an existing one.
 
-**2. GitHub Check Run** — shows on the PR header like CI/CD:
+### Real output
 
-```
-⏳ CodeReview AI — Analyzing your PR...        [Details]
-✅ CodeReview AI — Score 8.2/10 — 0 critical  [Details]
-❌ CodeReview AI — Score 3.1/10 — 1 critical  [Details]
-```
+| | |
+|---|---|
+| ![Instant acknowledgement](public/screenshots/review-in-progress.png) **Instant reply** while the agents work | ![Hardcoded secret flagged inline](public/screenshots/inline-hardcoded-secret.png) **Security agent** finds a committed API key |
+| ![SQL injection flagged inline](public/screenshots/inline-sql-injection.png) **SQL injection** on the exact line | ![Architecture finding](public/screenshots/inline-architecture.png) **Architecture agent** suggests a concrete refactor |
+| ![Error handling warning](public/screenshots/inline-error-handling.png) **Reliability**: missing try/catch | ![Scored summary](public/screenshots/summary-findings.png) **Aggregated summary** with severity-ranked findings |
 
-**3. Summary comment** — placeholder updates with full review:
+A clean PR finishes as a real GitHub Check Run (`Successful in 10s — Score: 10/10`):
 
-```
-🤖 CodeReview AI
+![Check Run passed](public/screenshots/checks-passed.png)
 
-> The PR introduces solid routing logic but has a critical security
-> vulnerability in the authentication handler.
+## What it does
 
-Overall Score: 6.8/10
+Open a pull request (or comment `/review`) and the app:
 
-| Dimension       | Score            |
-|-----------------|------------------|
-| 🔒 Security     | ██████░░░░  6/10 |
-| ⚡ Performance  | ████████░░  8/10 |
-| ✏️ Style        | ███████░░░  7/10 |
-| 🏛️ Architecture | ██████░░░░  6/10 |
+1. Posts a placeholder comment straight away and sets a Check Run to "in progress".
+2. Runs four agents at once on the diff: **security, performance, style, architecture**.
+3. Merges their output with a Gemini aggregator into one score, a summary and de-duplicated findings.
+4. Posts the findings as inline comments on the exact changed lines and finishes the Check Run (pass or fail).
 
-Findings (4 total)
+**Triggers and controls**
 
-🔴 [CRITICAL] httpServer.java:23 — Hardcoded credentials found
-🟡 [WARNING]  httpServer.java:78 — Database query inside loop (N+1)
-🔵 [INFO]     httpServer.java:45 — Variable name 'x' is not descriptive
-🔵 [INFO]     httpServer.java:91 — Consider extracting this into a service layer
-```
-
-**4. Inline comments** — findings anchored to exact lines in the diff (Files Changed tab)
-
-**5. Re-review on demand** — comment `/review` on any PR to trigger a fresh review without pushing new code
-
----
+| Action | Result |
+|---|---|
+| PR `opened` or `synchronize` | Automatic review |
+| Comment `/review` on a PR | On-demand re-run (rate limited) |
+| Title contains `[wip]`, `[skip-review]`, or starts with `wip:` / `draft:` | Review skipped |
 
 ## Architecture
 
 ```
-GitHub PR opened / commit pushed / /review comment
-          │
-          ▼ webhook (HMAC-SHA256 verified)
-┌─────────────────────────────────────────────────┐
-│            Next.js API Route — Vercel            │
-│  • Verify HMAC-SHA256 signature                  │
-│  • Skip WIP/draft PRs ([wip], [skip-review])     │
-│  • Idempotency check (repo:pr:commitSha)         │
-│  • Post placeholder comment instantly            │
-│  • Create GitHub Check Run (in_progress)         │
-│  • Return 200 in <100ms — non-blocking           │
-└──────────────────┬──────────────────────────────┘
-                   │ enqueue job
-                   ▼
-┌─────────────────────────────────────────────────┐
-│         Upstash Redis + BullMQ Queue             │
-│  jobId = repo:prNumber:commitSha                 │
-│  3 retries · exponential backoff                 │
-│  Concurrency: 3 parallel jobs                    │
-└──────────────────┬──────────────────────────────┘
-                   │ worker picks up job
-                   ▼
-┌─────────────────────────────────────────────────┐
-│           Worker Process — Render                │
-│  • GitHub App installation token (1hr TTL)       │
-│  • Fetch PR diff via Octokit                     │
-│  • Fetch full file contents                      │
-│  • Warn if files exceed 3000 chars               │
-└──────┬──────────┬────────────┬──────────┬───────┘
-       │          │            │          │  Promise.all
-       ▼          ▼            ▼          ▼
-  Security    Performance    Style    Architecture
-   Agent        Agent        Agent      Agent
-  Groq LLaMA  Groq LLaMA  Groq LLaMA  Groq LLaMA
-  diff patch   diff patch  diff patch  full files
-       └──────────┴────────────┴──────────┘
-                        │ 4x Finding[]
-                        ▼
-┌─────────────────────────────────────────────────┐
-│         Gemini 2.5 Flash — Aggregator            │
-│  • Merge findings from all 4 agents              │
-│  • Deduplicate overlapping issues                │
-│  • Score each dimension (1–10)                   │
-│  • Generate human-readable summary               │
-└──────────────┬───────────────┬──────────────────┘
-               │               │
-               ▼               ▼
-       Update placeholder   Update Check Run
-       comment with review  ✅ success / ❌ failure
-               │
-               ▼
-       Post inline comments
-       on exact diff lines
+GitHub ──webhook──▶ Next.js route (Vercel)
+                     │ verify HMAC · filter event · rate limit
+                     ▼
+                 BullMQ queue (Upstash Redis)
+                     ▼
+                 Worker (Render, concurrency 3)
+                     │ claim review (Postgres) ─ duplicate? → wait for the owner's result
+                     ▼
+        ┌──── Security ── Performance ── Style ── Architecture ────┐   Groq, in parallel
+                     ▼
+                 Gemini 2.5 Flash aggregator
+                     ▼
+        publish: inline comments + summary + Check Run (every PR that shares the result)
 ```
 
----
+The web app only validates and enqueues; all slow work happens in the worker, so a webhook always answers quickly and GitHub never retries.
 
-## Features
+## Key design decisions
 
-| Feature                 | Description                                                                     |
-| ----------------------- | ------------------------------------------------------------------------------- |
-| **4 parallel agents**   | Security, Performance, Style, Architecture run simultaneously via `Promise.all` |
-| **GitHub Check Run**    | ✅/❌ status on PR header — same as CodeRabbit, CodeClimate                     |
-| **Instant placeholder** | Bot appears within 2 seconds, updates when review completes                     |
-| **Inline comments**     | Findings anchored to exact lines in the diff                                    |
-| **`/review` trigger**   | Comment `/review` to re-run review without pushing new code                     |
-| **WIP skip**            | PRs with `[wip]`, `[skip-review]`, or `wip:` prefix are ignored                 |
-| **Large file warning**  | Files over 3000 chars trigger a modularization warning                          |
-| **Idempotency**         | Same commit never reviewed twice — handles GitHub webhook retries               |
-| **Per-repo tokens**     | GitHub App installation tokens scoped to each repo — expires in 1hr             |
-| **Auto retry**          | Failed jobs retry 3 times with exponential backoff                              |
+| Decision | Why |
+|---|---|
+| Separate worker behind a queue | GitHub expects a response in seconds; LLM calls take longer and fail. Decoupling keeps the webhook fast and makes work retryable. |
+| One review per `repo + tree SHA` | Identical code (same tree) is never paid for twice, even across different PRs, branches or re-pushes. |
+| Owner / waiter claiming with one atomic upsert | Concurrent identical requests cannot both run. Waiters receive the owner's result on their own PR and Check Run, exactly once. |
+| Four narrow agents instead of one big prompt | Smaller, focused prompts give better findings, run in parallel, and a failing agent does not take down the others. |
+| Cheap fast model for agents, stronger model to aggregate | Keeps latency and cost low while still producing one coherent verdict. |
+| Fail open on Redis rate limiting | A cache outage should degrade protection, not block reviews. |
 
----
+## Fault tolerance
 
-## Deployment Architecture
+| Concern | How it is handled |
+|---|---|
+| Forged requests | HMAC-SHA256 signature, constant-time compare; invalid requests get 401 before any work |
+| Noisy repos | Redis rate limits: 3 events per PR and 20 per repo per minute |
+| Duplicate work | One review per `repo + tree SHA`, enforced by a unique database row and a deterministic job ID |
+| Simultaneous identical requests | An atomic `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` picks one **owner**; the rest become **waiters** and get the same result on their own PR and Check Run, exactly once |
+| Transient failures | BullMQ retries: 5 attempts, exponential backoff starting at 5 s |
+| Permanent failure | Job is marked failed in Postgres and any waiting requests are failed too, so nothing hangs |
+| Crashed worker | A claim older than 15 minutes can be taken over; a daily GitHub Actions job reconciles stale reviews |
+| Bad LLM output | Agent errors are rethrown (not cached as an empty review) so retries can recover |
+| One agent failing | Agents are isolated; the others still report |
+| Redis down | Rate limiting fails open so reviews still run |
 
-The app runs as **three independently deployed services** — not a single monolith:
+## Tech stack
 
-| Service               | Platform          | Role                                                  |
-| --------------------- | ----------------- | ----------------------------------------------------- |
-| Web service (Next.js) | **Vercel**        | Receives webhooks, verifies signatures, enqueues jobs |
-| Queue / shared state  | **Upstash Redis** | Serverless Redis backing BullMQ + idempotency store   |
-| Worker process        | **Render**        | Long-running process — runs agents, posts results     |
+- **App:** Next.js 16 (App Router), React 19, Tailwind CSS v4, NextAuth
+- **Queue and cache:** BullMQ, Upstash Redis (ioredis)
+- **Database:** Postgres (Supabase) with Drizzle ORM and SQL migrations
+- **AI:** Groq `openai/gpt-oss-20b` for the agents, Gemini 2.5 Flash for aggregation
+- **GitHub:** Octokit with GitHub App authentication
+- **Quality:** TypeScript, ESLint, Vitest, GitHub Actions CI
+- **Deploy:** Vercel (web), Render (worker), Docker for both. Runs on free tiers.
 
-**Why split across three platforms?**
+## Project structure
 
-- **Vercel** handles bursty stateless request traffic — perfect for a webhook that must respond in under 10 seconds and scale to zero when idle.
-- **Upstash Redis** is HTTP-based serverless Redis — no persistent connection management from serverless functions, shared between Vercel and Render.
-- **Render** hosts the worker as a genuine long-running process — LLM calls to 4 agents plus an aggregator take 15-30 seconds, well past typical serverless limits.
+```
+src/app/            Pages (home, how-it-works, security, deployment) and API routes
+  api/webhook/github/   Webhook entry point
+components/         UI, including the interactive simulation, pipeline views and screenshot gallery
+lib/                Agents, aggregator, GitHub client, publishing, queue, rate limiting
+Worker/             BullMQ worker and the stale-job reconciler
+repository/         Database access (claim, waiters, results)
+config/db/          Drizzle schema
+drizzle/            SQL migrations
+tests/              Vitest tests
+public/screenshots/ Real PR output used by the site and this README
+.github/workflows/  CI and the daily reconcile job
+```
 
-Each tier scales, deploys, and fails independently. A spike in PRs never touches worker capacity — jobs queue in Upstash and the Render worker drains them at its own pace.
+## Run it locally
 
----
-
-## Tech Stack
-
-| Layer                  | Technology                                         |
-| ---------------------- | -------------------------------------------------- |
-| **Framework**          | Next.js 14 (App Router)                            |
-| **Language**           | TypeScript                                         |
-| **Job Queue**          | BullMQ                                             |
-| **Queue Store**        | Upstash Redis (managed, serverless)                |
-| **GitHub Integration** | GitHub App + `@octokit/rest` + `@octokit/auth-app` |
-| **LLM — Agents**       | Groq `llama-3.3-70b-versatile`                     |
-| **LLM — Aggregator**   | Google Gemini 2.5 Flash                            |
-| **Hosting — Web**      | Vercel                                             |
-| **Hosting — Worker**   | Render                                             |
-| **Worker Runtime**     | `tsx`                                              |
-
----
-
-## How It Works
-
-### 1. GitHub App Webhook
-
-Every PR event fires a webhook to `/api/webhook/github`. The route verifies the HMAC-SHA256 signature, skips WIP PRs, checks Redis for idempotency, posts a placeholder comment, creates a GitHub Check Run, and pushes a job to BullMQ. Returns `200` immediately — all processing is async.
-
-### 2. Job Queue
-
-BullMQ with Upstash Redis handles async processing with automatic retries (3 attempts, exponential backoff) and concurrency control (3 parallel jobs). Idempotency key `repo:prNumber:commitSha` prevents double-reviews on GitHub webhook retries.
-
-### 3. GitHub App Authentication
-
-Instead of a personal access token, the app uses **GitHub App installation tokens** — short-lived tokens (1 hour) scoped to the specific repo. Generated fresh per job via `@octokit/auth-app`. Works for any repo where the app is installed.
-
-### 4. Parallel Agent Fanout
-
-4 agents review the PR simultaneously via `Promise.all`:
-
-- **Security** — hardcoded secrets, injection vulnerabilities, auth bypass, exposed sensitive data
-- **Performance** — N+1 queries, memory leaks, blocking I/O, inefficient algorithms
-- **Style** — naming conventions, dead code, missing error handling, overly complex functions
-- **Architecture** — SOLID violations, tight coupling, separation of concerns, scalability issues
-
-Security, Performance, and Style agents receive the **diff patch**. Architecture agent receives **full file content** (capped at 3000 chars per file). Files exceeding this limit trigger a modularization warning in the placeholder comment.
-
-### 5. Gemini Aggregator
-
-All 4 agent results passed to Gemini 2.5 Flash — merges findings, removes duplicates flagged by multiple agents, scores each dimension 1–10, writes a human-readable summary.
-
-### 6. Results Posted to PR
-
-- **Placeholder comment** updated with full review (scores + all findings)
-- **GitHub Check Run** updated to ✅ success or ❌ failure based on score and critical count
-- **Inline review comments** posted on exact diff lines (`Promise.allSettled` — failed lines skipped silently)
-
-### 7. Re-review on Demand
-
-Comment `/review` on any PR → `issue_comment` webhook fires → bot fetches latest commit → re-runs full pipeline → posts fresh review.
-
----
-
-## Key Design Decisions
-
-**Why GitHub App over OAuth/personal token?**
-GitHub Apps have their own bot identity (`aicodereview001[bot]`), 3x higher rate limits (15,000 req/hour), short-lived per-repo installation tokens, and work across any repo where the app is installed — not just yours.
-
-**Why GitHub Check Runs?**
-Check Runs appear on the PR header like CI/CD — same as CodeRabbit, CodeClimate, SonarQube. More visible than a comment, can signal pass/fail, and clicking Details shows the full breakdown. This is what separates a "bot that posts comments" from a "production code review tool."
-
-**Why BullMQ over direct processing?**
-GitHub requires a `200` response within 10 seconds or it retries. LLM calls take 10–30 seconds. BullMQ decouples receiving the webhook from processing it — webhook returns instantly, worker processes in background with automatic retry on failure.
-
-**Why parallel agents instead of one big prompt?**
-One "review everything" prompt produces mediocre, unfocused results. Four specialized agents with tight system prompts catch significantly more in their domains. Running in parallel means total time = slowest agent, not the sum of all four.
-
-**Why Gemini for aggregation?**
-Multiple agents often flag the same issue from different angles. Gemini's stronger reasoning handles semantic deduplication and coherent synthesis better than programmatic merging or a smaller model.
-
-**Why Vercel + Upstash + Render instead of one host?**
-Each service has a fundamentally different runtime profile: bursty stateless traffic (Vercel), persistent shared state without connection-pool headaches (Upstash), and continuous long-running processes (Render). Matching each service to the platform built for its workload beats forcing everything onto one server.
-
-**Idempotency via `jobId = repo:prNumber:commitSha`**
-BullMQ skips job creation if the same ID already exists. The same commit is never reviewed twice — even under GitHub webhook retries.
-
----
-
-## Setup
-
-### Prerequisites
-
-- Node.js 18+
-- Redis (`docker run -d -p 6379:6379 redis`) or [Upstash](https://upstash.com) for production
-- [Groq API key](https://console.groq.com/keys) — free
-- [Gemini API key](https://aistudio.google.com/apikey) — free
-
-### 1. Clone and install
+You need Node 22+, Postgres, Redis, and a GitHub App.
 
 ```bash
-git clone https://github.com/PIYuusHYADAV/CodeReviewAI
-cd CodeReviewAI
+git clone https://github.com/PIYuusHYADAV/CodeReviewAI.git && cd CodeReviewAI
 npm install
+cp .env.example .env.local   # then fill in the values below
+npx drizzle-kit migrate
+npm run dev        # web on :3000
+npm run worker     # worker in a second terminal
 ```
 
-### 2. Create a GitHub App
-
-1. Go to [github.com/settings/apps/new](https://github.com/settings/apps/new)
-2. Set **Webhook URL** → your URL + `/api/webhook/github`
-3. Set **Repository permissions**:
-   - Contents → Read-only
-   - Pull requests → Read & Write
-   - Issues → Read & Write
-   - Checks → Read & Write
-   - Metadata → Read-only
-4. Subscribe to events: **Pull request**, **Issue comment**
-5. Generate a private key → copy `.pem` to project root
-
-### 3. Environment variables
+Or run everything (web, worker, Postgres, Redis) with Docker:
 
 ```bash
-# .env.local
-GITHUB_APP_ID=your_app_id
-WEBHOOK_SECRET=your_webhook_secret
-GROQ_API_KEY=gsk_xxxx
-GEMINI_API_KEY=AIzaxxxx
-REDIS_URL=redis://localhost:6379
+docker compose up --build
 ```
 
-### 4. Run locally
+### Create the GitHub App
+
+1. GitHub → Settings → Developer settings → GitHub Apps → New.
+2. **Webhook URL:** your tunnel URL + `/api/webhook/github` (use ngrok or localtunnel locally). **Webhook secret:** same value as `WEBHOOK_SECRET`.
+3. **Repository permissions:** Pull requests (read and write), Issues (read and write, for comments), Checks (read and write), Contents (read).
+4. **Subscribe to events:** Pull request, Issue comment.
+5. Generate a private key and put its contents in `privatekey`.
+
+### Environment variables
+
+| Variable | Purpose |
+|---|---|
+| `APP_ID` | GitHub App ID |
+| `privatekey` | GitHub App private key (PEM contents) |
+| `WEBHOOK_SECRET` | Secret used to sign webhooks |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | OAuth credentials for sign-in |
+| `Groq_Token` | Groq API key (agents) |
+| `Gemini_Key` | Gemini API key (aggregator) |
+| `DATABASE_URL` | Postgres connection string |
+| `REDIS_URL` | Redis connection string |
+| `NEXTAUTH_SECRET`, `NEXTAUTH_URL` | NextAuth configuration |
+| `NEXT_PUBLIC_VIDEO_URL` | Embed URL of the walkthrough video shown on the site |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Only for `docker compose` |
+
+Never commit `.env*` files or the `.pem` key (both are in `.gitignore`).
+
+## Deployment
+
+| Part | Where | Notes |
+|---|---|---|
+| Web app and webhook | Vercel | `output: "standalone"`; deploys are triggered by the CI workflow after tests pass |
+| Worker | Render (Docker, `Dockerfile.worker`) | Long-running process; scale by raising BullMQ concurrency |
+| Postgres | Supabase | Run `npx drizzle-kit migrate` on schema changes |
+| Redis | Upstash | Queue, cache and rate limits |
+| Stale-job reconcile | GitHub Actions (daily cron) | `.github/workflows/reconcile.yml` |
+
+## Testing
 
 ```bash
-npm run dev              # Terminal 1 — Next.js
-npx tsx Worker/index.ts  # Terminal 2 — Worker
-npx localtunnel --port 3000  # Terminal 3 — Tunnel
+npm run test:run
 ```
 
-### 5. Install the app on a repo
+27 test cases across 4 files cover rate limiting, diff-line mapping (so comments land on valid lines), database claiming and concurrent duplicate requests. CI runs the type check, tests and build on every push to `main` before deploying.
 
-GitHub App → **Install App** → select repo → **Install**. Open a PR — bot reviews it automatically.
+## Limitations and roadmap
 
----
+Honest scope, so expectations match reality:
 
-## Project Structure
+- Reviews are based on the PR diff plus file context; very large files are trimmed (8,000 characters of full-file context are sent to the model), so findings on huge files may be incomplete.
+- Findings are LLM output and can be wrong. Treat them as a first pass, not a gate; there is no per-repo configuration for severity thresholds yet.
+- Free-tier LLM rate limits cap throughput under heavy load.
 
-```
-├── app/
-│   ├── api/
-│   │   └── webhook/github/
-│   │       └── route.ts       # Webhook receiver, signature verification, job enqueue
-│   └── page.tsx               # Landing page
-├── lib/
-│   ├── agents.ts              # Security, Performance, Style, Architecture agents
-│   ├── aggregator.ts          # Gemini aggregator — merge, dedupe, score
-│   ├── formatter.ts           # Markdown comment formatter
-│   ├── github.ts              # Octokit + GitHub App auth + Check Runs
-│   ├── queue.ts               # BullMQ queue definition
-│   ├── redis.ts               # Redis connection + BullMQ config
-│   └── types.ts               # Finding, AgentResult, AggregatedReview types
-├── Worker/
-│   ├── index.ts               # Worker entry point
-│   └── worker.ts              # Full review pipeline
-├── private-key.pem            # GitHub App private key (gitignored)
-└── .env.local                 # Environment variables (gitignored)
-```
-
----
+Planned: per-repo config file (`.codereview.yml`) for enabled agents and thresholds, a feedback reaction (👍/👎) loop to measure finding quality, an evaluation set of PRs with known bugs to track precision and recall, and observability (metrics and tracing) for queue depth and agent latency.
 
 ## Author
 
-**Piyush Yadav** — [linkedin.com/in/piyush-yadav](https://www.linkedin.com/in/piyush-yadav-9611832b4/) · [github.com/PIYuusHYADAV](https://github.com/PIYuusHYADAV)
+Built by [Piyush Yadav](https://github.com/PIYuusHYADAV). Feedback and issues are welcome.

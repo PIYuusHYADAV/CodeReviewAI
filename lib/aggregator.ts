@@ -47,11 +47,6 @@ export async function runAggregator(
     };
   } catch (err) {
     console.error("[Aggregator] failed:", err);
-    return {
-      overallScore: 0,
-      summary: "Aggregation failed",
-      findings: [],
-      breakdown: { security: 0, performance: 0, style: 0, architecture: 0 },
-    };
+    throw err;
   }
 }

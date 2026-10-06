@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
 
       const jobId = `${repo}--${treeSha}`;
 
-      Promise.all([
+      await Promise.all([
         reviewQueue.add(
           "review-pr",
           {

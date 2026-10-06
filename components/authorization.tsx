@@ -4,7 +4,6 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import AllRepo from "./listAllRepo";
 export default function Authorization() {
   const { data: session } = useSession();
-  console.log(session?.accessToken);
 
   if (session) {
     return (

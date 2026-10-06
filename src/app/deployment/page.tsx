@@ -9,8 +9,7 @@ export default function Deployment() {
           Where each piece runs and how it ships.
         </h1>
         <p className="mt-6 text-lg text-muted">
-          Each view plays as you scroll to it. Pause, step back or press Play to
-          go again.
+          Step through each view with Next and Back, or press Play to watch it run.
         </p>
       </header></Reveal>
       <Simulation ids={["deploy", "docker", "cicd"]} />

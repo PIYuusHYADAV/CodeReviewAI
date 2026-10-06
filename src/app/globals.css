@@ -28,14 +28,26 @@ h1, h2, h3 { font-family: var(--font-display), system-ui, sans-serif; letter-spa
   background-size: 44px 44px;
   mask-image: radial-gradient(ellipse at 50% 0%, #000 30%, transparent 75%);
 }
-@keyframes sheen { to { background-position: 200% center; } }
-.sheen { background: linear-gradient(110deg, #fff0 30%, #ffffff30 50%, #fff0 70%) 0 0 / 200% 100%; animation: sheen 3.5s linear infinite; }
-@keyframes dash { to { stroke-dashoffset: -24; } }
-.flow-dash { animation: dash 1s linear infinite; }
-@media (prefers-reduced-motion: reduce) { .sheen, .flow-dash { animation: none; } }
-html.lenis, html.lenis body { height: auto; }
-.lenis.lenis-smooth { scroll-behavior: auto !important; }
-.lenis.lenis-stopped { overflow: clip; }
-html { scroll-behavior: smooth; }
-html.lenis { scroll-behavior: auto; }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+html { scroll-behavior: smooth; scroll-padding-top: 5.5rem; }
+::selection { background: #8b7bff55; color: #fff; }
+
+/* Smooth, restrained motion: one gentle fade between pages, and eased colour changes on hover.
+   No scroll-triggered animation. */
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.28s; animation-timing-function: ease; }
+
+@keyframes page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+main { animation: page-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+a, button, [role="tab"], summary {
+  transition-property: color, background-color, border-color, box-shadow, opacity;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  main { animation: none; }
+  @view-transition { navigation: none; }
+  *, *::before, *::after { transition-duration: 0.01ms !important; }
+}

@@ -65,7 +65,7 @@ export function HomeSections() {
         </Reveal>
         <Stagger className="grid gap-5 md:grid-cols-3" gap={0.12}>
           {pillars.map((p) => (
-            <div key={p.t} className="h-full rounded-3xl border border-line bg-card p-7 transition-all duration-500 hover:-translate-y-1 hover:border-brand/40">
+            <div key={p.t} className="h-full rounded-3xl border border-line bg-card p-7 transition-colors hover:border-brand/40">
               <p.icon className="text-good" size={26} />
               <h3 className="mt-4 text-xl font-semibold">{p.t}</h3>
               <p className="mt-2 text-muted">{p.d}</p>

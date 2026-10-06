@@ -1,6 +1,4 @@
 "use client";
-import { useRef } from "react";
-import { motion, useScroll, useSpring } from "motion/react";
 import {
   GitPullRequest,
   Webhook,
@@ -40,7 +38,7 @@ const steps = [
   {
     icon: ListChecks,
     title: "The job goes into a queue",
-    text: "The app checks the cache and the database for the same code, saves a pending review record, then queues the job so the webhook can reply without waiting. A failed job retries automatically, up to 5 attempts, and the same code is never reviewed twice.",
+    text: "The app checks the cache and the database for the same code. One request claims the review and queues the job, so the webhook can reply without waiting. Any identical request that arrives meanwhile is registered as a waiter and gets the same result. A failed job retries automatically, up to 5 attempts, and the same code is never reviewed twice.",
     tags: ["Redis queue", "Postgres record", "Upstash", "Supabase"],
   },
   {
@@ -71,45 +69,17 @@ const steps = [
 ];
 
 export function Pipeline() {
-  const ref = useRef<HTMLOListElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start 70%", "end 60%"],
-  });
-  const scaleY = useSpring(scrollYProgress, { stiffness: 120, damping: 30 });
-
   return (
-    <ol
-      ref={ref}
-      className="relative mx-auto max-w-4xl space-y-16 pl-14 sm:pl-20"
-    >
+    <ol className="relative mx-auto max-w-4xl space-y-16 pl-14 sm:pl-20">
       <span
         aria-hidden
         className="absolute bottom-0 left-[22px] top-0 w-px bg-line sm:left-[30px]"
       />
-      <motion.span
-        aria-hidden
-        style={{ scaleY }}
-        className="absolute bottom-0 left-[21px] top-0 w-0.5 origin-top bg-brand sm:left-[29px]"
-      />
       {steps.map((s, i) => (
-        <motion.li
-          key={s.title}
-          initial={{ opacity: 0.25 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ margin: "-35% 0px -35% 0px" }}
-          transition={{ duration: 0.4 }}
-          className="relative"
-        >
-          <motion.span
-            initial={{ scale: 0.8 }}
-            whileInView={{ scale: 1 }}
-            viewport={{ margin: "-35% 0px -35% 0px" }}
-            transition={{ type: "spring", bounce: 0.5 }}
-            className="absolute -left-14 top-0 grid size-11 place-items-center rounded-full border border-brand/30 bg-card text-brand shadow-md sm:-left-20 sm:size-[60px]"
-          >
+        <li key={s.title} className="relative">
+          <span className="absolute -left-14 top-0 grid size-11 place-items-center rounded-full border border-brand/30 bg-card text-brand sm:-left-20 sm:size-[60px]">
             <s.icon size={22} />
-          </motion.span>
+          </span>
           <p className="font-mono text-sm text-brand">Step {i + 1}</p>
           <h3 className="mt-1 text-2xl font-semibold sm:text-3xl">{s.title}</h3>
           <p className="mt-3 max-w-xl text-lg leading-relaxed text-muted">
@@ -133,7 +103,7 @@ export function Pipeline() {
             </p>
           )}
           {s.shot && <ScreenshotFrame {...s.shot} className="mt-8" />}
-        </motion.li>
+        </li>
       ))}
     </ol>
   );

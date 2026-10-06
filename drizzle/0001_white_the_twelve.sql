@@ -13,6 +13,6 @@ CREATE TABLE "reviewWaiters" (
 	CONSTRAINT "unique_waiter" UNIQUE("userinfo","treesha","checkRunId")
 );
 --> statement-breakpoint
+ALTER TABLE "userCredentials" ADD CONSTRAINT "unique_repo_treesha" UNIQUE("userinfo","treesha");--> statement-breakpoint
 ALTER TABLE "reviewWaiters" ADD CONSTRAINT "waiters_review_fk" FOREIGN KEY ("userinfo","treesha") REFERENCES "public"."userCredentials"("userinfo","treesha") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "waiters_lookup_idx" ON "reviewWaiters" USING btree ("userinfo","treesha","status");--> statement-breakpoint
-ALTER TABLE "userCredentials" ADD CONSTRAINT "unique_repo_treesha" UNIQUE("userinfo","treesha");
+CREATE INDEX "waiters_lookup_idx" ON "reviewWaiters" USING btree ("userinfo","treesha","status");
