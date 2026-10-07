@@ -143,6 +143,7 @@ const worker = new Worker("review-queue", processReview, {
   connection: getBullMQConnection(),
   concurrency: 3,
   drainDelay: 10,
+  stalledInterval: 5 * 60 * 1000,
 });
 
 worker.on("completed", (job) => {

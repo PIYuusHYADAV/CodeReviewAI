@@ -1,6 +1,6 @@
-import { Simulation } from "../../../components/sim/simulation";
 import { Reveal } from "../../../components/reveal";
 import { Cta } from "../../../components/cta";
+import { DeploymentOverview } from "../../../components/deployment-overview";
 export default function Deployment() {
   return (
     <main className="px-6 pb-24 pt-20">
@@ -9,10 +9,10 @@ export default function Deployment() {
           Where each piece runs and how it ships.
         </h1>
         <p className="mt-6 text-lg text-muted">
-          Step through each view with Next and Back, or press Play to watch it run.
+          Six platforms, one gated pipeline, and containers for running it all locally.
         </p>
       </header></Reveal>
-      <Simulation ids={["deploy", "docker", "cicd"]} />
+      <DeploymentOverview />
       <Cta />
     </main>
   );

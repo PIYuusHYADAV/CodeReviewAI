@@ -2,7 +2,7 @@
 import { useLayoutEffect, useState } from "react";
 import { GitPullRequest, ShieldCheck } from "lucide-react";
 
-import { Simulation } from "../sim/simulation";
+import { Architecture } from "../architecture";
 import { Pipeline } from "../pipeline";
 import { SecurityView } from "./security-view";
 import { cn } from "../../lib/utils";
@@ -24,6 +24,8 @@ export function HowItWorksViews() {
     const sp = new URLSearchParams(q);
     if (sp.get("view") === "security") {
       sp.delete("view");
+      /* Reading the shared link has to happen after mount, before the URL is rewritten. */
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSeed(sp.toString() ? q : "");
       setView("security");
     }
@@ -77,7 +79,7 @@ export function HowItWorksViews() {
       <div key={view} role="tabpanel" id="hiw-panel" aria-labelledby={`hiw-tab-${view}`} className="animate-in fade-in duration-300 motion-reduce:animate-none">
         {view === "workflow" ? (
           <>
-            <Simulation ids={["journey"]} />
+            <Architecture />
             <div className="mt-28">
               <Pipeline />
             </div>

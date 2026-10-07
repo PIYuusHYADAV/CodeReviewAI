@@ -136,6 +136,8 @@ export function BuiltExperience({ initialSearch }: { initialSearch?: string }) {
       if (o) v[inp.id] = o.value;
     }
     const n = s.locked ? 1 : s.build(v).length;
+    /* Restoring state from a shared link has to happen after mount. */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSid(s.id);
     setVals(v);
     setStep(Math.max(0, Math.min(Number(p.get("st")) || 0, n - 1)));

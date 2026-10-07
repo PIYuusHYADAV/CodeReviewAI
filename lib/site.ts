@@ -8,3 +8,6 @@ export const site = {
 export const CODE_REF = "main";
 export const codeLink = (path: string, lines?: [number, number]) =>
   `${site.repoUrl}/blob/${CODE_REF}/${path}${lines ? `#L${lines[0]}-L${lines[1]}` : ""}`;
+
+/* Keep in sync with `npm run test:run` (count of it(...) cases in tests/). Shown on the home page. */
+export const TEST_COUNT = 22;

@@ -4,6 +4,7 @@ import "./globals.css";
 import Providers from "./provider";
 
 import { Nav } from "../../components/nav";
+import { Footer } from "../../components/footer";
 const display = Bricolage_Grotesque({
   subsets: ["latin"],
   variable: "--font-display",
@@ -39,6 +40,7 @@ export default function RootLayout({
         <Providers>
           <Nav />
           {children}
+          <Footer />
         </Providers>
       </body>
     </html>

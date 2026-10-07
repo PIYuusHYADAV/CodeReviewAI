@@ -85,7 +85,7 @@ function FailOpen() {
 
 const CARDS = [
   { title: "Retries with backoff", problem: "The AI provider times out.", fix: "Up to 5 attempts, waiting 5s, 10s, 20s… between each. Permanent failures are recorded in the database, not lost.", Viz: Retries },
-  { title: "Never review twice", problem: "Two pushes land with identical code.", fix: "Reviews are keyed to the tree SHA, so the saved result is reused: no second job, no second AI bill.", Viz: Dedup },
+  { title: "Never review twice", problem: "Two PRs land together with identical code.", fix: "Reviews are keyed to the tree SHA. If identical PRs arrive at the same moment, an atomic database claim picks one owner; the others wait and get the same result on their own PR.", Viz: Dedup },
   { title: "Self-healing stuck jobs", problem: "A worker dies mid-review.", fix: "A record stuck over 15 minutes counts as abandoned and is queued again. A nightly sweep requeues anything still stale.", Viz: Stuck },
   { title: "Failures stay contained", problem: "One inline comment can't be posted.", fix: "Comments are posted independently. One failure never takes down the rest of the review.", Viz: Isolated },
   { title: "Fast replies, slow work apart", problem: "A review takes a minute; GitHub waits seconds.", fix: "The web service answers immediately and queues the job. A separate worker (3 at a time) does the slow AI work.", Viz: Decoupled },

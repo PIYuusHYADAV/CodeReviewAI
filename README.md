@@ -3,7 +3,7 @@
 [![CI](https://github.com/PIYuusHYADAV/CodeReviewAI/actions/workflows/ci.yml/badge.svg)](https://github.com/PIYuusHYADAV/CodeReviewAI/actions/workflows/ci.yml)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
-![Tests](https://img.shields.io/badge/tests-27%20cases-34d399)
+![Tests](https://img.shields.io/badge/tests-22%20passing-34d399)
 
 A GitHub App that reviews every pull request with **four specialized LLM agents running in parallel**, then posts the findings as inline comments on the exact changed lines plus a scored GitHub Check Run, usually within seconds.
 
@@ -114,7 +114,7 @@ The web app only validates and enqueues; all slow work happens in the worker, so
 ```
 src/app/            Pages (home, how-it-works, security, deployment) and API routes
   api/webhook/github/   Webhook entry point
-components/         UI, including the interactive simulation, pipeline views and screenshot gallery
+components/         UI: architecture diagram, request timeline, screenshot gallery, and an optional lazy-loaded interactive simulator
 lib/                Agents, aggregator, GitHub client, publishing, queue, rate limiting
 Worker/             BullMQ worker and the stale-job reconciler
 repository/         Database access (claim, waiters, results)
@@ -186,7 +186,16 @@ Never commit `.env*` files or the `.pem` key (both are in `.gitignore`).
 npm run test:run
 ```
 
-27 test cases across 4 files cover rate limiting, diff-line mapping (so comments land on valid lines), database claiming and concurrent duplicate requests. CI runs the type check, tests and build on every push to `main` before deploying.
+22 test cases across 4 files cover rate limiting, diff-line mapping (so comments land on valid lines), and database claiming.
+
+The **concurrency tests** (`tests/concurrency.test.ts`) run against a real Postgres (PGlite, in-process, using the project's actual migrations) rather than a mock, because the guarantee lives in the database. They prove that:
+
+- 10 simultaneous identical requests produce exactly one owner and nine waiters, and one database row
+- a failed review, or a claim stale for over 15 minutes, is taken over by exactly one retry; a fresh in-progress claim is never stolen
+- a request arriving after completion gets the stored result
+- a waiter that registers just after the owner finished still receives the result, and concurrent delivery to one waiter succeeds exactly once
+
+CI runs the type check, tests and build on every push to `main` before deploying.
 
 ## Limitations and roadmap
 

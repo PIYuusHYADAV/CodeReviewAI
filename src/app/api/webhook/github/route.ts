@@ -9,8 +9,6 @@ import {
   createCheckRun,
   getOctokit,
   postPlaceHolderComment,
-  postPRComment,
-  updateCheckRun,
 } from "../../../../../lib/github";
 
 import {
@@ -23,7 +21,7 @@ import {
 } from "../../../../../repository/dbrepo";
 import { checkKey, getCachedResult } from "../../../../../utils/redisutils";
 import { AggregatorReview } from "../../../../../lib/aggregator";
-import { cachedComment } from "../../../../../lib/utils";
+
 import { publishReview } from "../../../../../lib/publish";
 
 export async function POST(req: NextRequest) {

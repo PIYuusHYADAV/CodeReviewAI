@@ -5,7 +5,7 @@ import {
   postInlineComment,
   updateCheckRun,
 } from "./github";
-import { PRFile } from "./type";
+
 import { AggregatorReview } from "./aggregator";
 import { getValidDiffLines } from "../utils/Validate";
 const emoji = (s: string) =>
@@ -17,7 +17,6 @@ export async function publishReview(opts: {
   checkRunId: number;
   review: AggregatorReview;
   octokit: Octokit;
-
 }): Promise<number> {
   const { repo, prNumber, commitSha, checkRunId, review, octokit } = opts;
   const diff = await getDiffPr(repo, prNumber, octokit);

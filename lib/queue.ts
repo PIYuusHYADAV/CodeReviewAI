@@ -4,10 +4,12 @@ export const reviewQueue = new Queue("review-queue", {
   connection: getBullMQConnection(),
   defaultJobOptions: {
     attempts: 5,
+
     backoff: {
       type: "exponential",
       delay: 5000,
     },
+
     removeOnComplete: {
       age: 24 * 3600,
       count: 1000,

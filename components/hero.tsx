@@ -4,7 +4,7 @@ import { ArrowRight, Star } from "lucide-react";
 import { Github } from "./github-icon";
 import { Button } from "./ui/button";
 import { VideoSlot } from "./video-slot";
-import { site } from "../lib/site";
+import { site, TEST_COUNT } from "../lib/site";
 
 const stack = ["Next.js 16", "TypeScript", "BullMQ", "Postgres", "Redis", "Groq + Gemini", "Docker", "CI/CD"];
 
@@ -15,7 +15,7 @@ export function Hero() {
       <div className="grid-bg absolute inset-0 -z-10" />
       <div className="mx-auto max-w-3xl text-center">
         <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-line bg-card px-4 py-1.5 font-mono text-xs text-muted">
-          <span className="size-2 rounded-full bg-good" /> Live in production · 27 automated tests
+          <span className="size-2 rounded-full bg-good" /> Live in production · {TEST_COUNT} automated tests
         </p>
         <h1 className="mt-5 text-balance bg-gradient-to-b from-white to-white/55 bg-clip-text text-4xl font-semibold leading-[1.06] text-transparent sm:text-6xl">
           Every pull request, reviewed in seconds.

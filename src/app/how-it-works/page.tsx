@@ -7,11 +7,10 @@ export default function HowItWorks() {
     <main className="px-6 pb-24 pt-20">
       <Reveal className="mx-auto mb-10 max-w-3xl text-center"><header>
         <h1 className="text-balance text-5xl font-semibold sm:text-6xl">
-          What happens after you open a pull request.
+          How it works, and how it stays safe.
         </h1>
         <p className="mt-6 text-lg text-muted">
-          Watch the walkthrough, or read through every step below with nothing
-          hidden.
+          Watch the walkthrough, then choose a view: the request path from start to finish, or the security and fault tolerance behind it.
         </p>
       </header></Reveal>
       <section className="mx-auto mb-20 max-w-4xl">

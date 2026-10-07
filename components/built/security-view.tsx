@@ -2,15 +2,20 @@
 import { useState } from "react";
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
 
-import { BuiltExperience } from "./built-sim";
+import dynamic from "next/dynamic";
 import { Reveal } from "../reveal";
 import { Counter } from "../counter";
 import { DefenseIntro, DefenseLayers } from "../security/defense-layers";
 import { Resilience } from "../security/resilience";
 
+const BuiltExperience = dynamic(() => import("./built-sim").then((m) => m.BuiltExperience), {
+  ssr: false,
+  loading: () => <p className="py-12 text-center text-muted">Loading the simulator…</p>,
+});
+
 const stats = [
   { to: 4, label: "protection layers before any AI runs" },
-  { to: 5, label: "automatic retries with backoff" },
+  { to: 5, label: "attempts per job, with exponential backoff" },
   { to: 24, suffix: "h", label: "result cache, same code never re-reviewed" },
   { to: 15, suffix: " min", label: "until a stuck job is recovered" },
 ];
